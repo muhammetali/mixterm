@@ -8,9 +8,7 @@ import '../services/auth_service.dart';
 import '../widgets/server_list.dart';
 import '../widgets/terminal_view.dart';
 import '../widgets/sftp_browser.dart';
-import '../widgets/local_file_browser.dart';
 import '../widgets/session_tab_bar.dart';
-import '../widgets/split_pane.dart';
 import '../widgets/dialogs/add_server_dialog.dart';
 import '../utils/theme.dart';
 import 'settings_screen.dart';
@@ -152,22 +150,6 @@ class _HomeScreenState extends State<HomeScreen> {
         final tabIds = tabProvider.tabs.map((t) => t.id).toSet();
         _tabWidgetCache.removeWhere((key, _) => !tabIds.contains(key));
 
-        if (tabProvider.isSplitView) {
-          return SplitPane(
-            key: ValueKey('split_${tabProvider.leftPaneTabId}_${tabProvider.rightPaneTabId}'),
-            initialPosition: tabProvider.splitPosition,
-            onPositionChanged: tabProvider.setSplitPosition,
-            leftPane: KeyedSubtree(
-              key: ValueKey('left_pane_${tabProvider.leftPaneTabId}'),
-              child: _buildPaneContent(tabProvider.leftPaneTabId, tabProvider),
-            ),
-            rightPane: KeyedSubtree(
-              key: ValueKey('right_pane_${tabProvider.rightPaneTabId}'),
-              child: _buildPaneContent(tabProvider.rightPaneTabId, tabProvider),
-            ),
-          );
-        }
-
         // Use Stack with Offstage to keep all tabs alive but only show active
         return Stack(
           children: tabProvider.tabs.map((tab) {
@@ -203,50 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
           serverId: tab.serverId!,
           tabId: tab.id,
         );
-      case TabType.local:
-        return LocalFileBrowser(
-          key: ValueKey('local_${tab.id}'),
-          onPathChanged: (path) {
-            tabProvider.updateTabPath(tab.id, path);
-          },
-        );
     }
-  }
-
-  Widget _buildPaneContent(String? tabId, TabProvider tabProvider) {
-    if (tabId == null) {
-      return _buildEmptyPaneState();
-    }
-
-    final tab = tabProvider.getTab(tabId);
-
-    if (tab == null) {
-      return _buildEmptyPaneState();
-    }
-
-    return _getOrCreateTabWidget(tab, tabProvider);
-  }
-
-  Widget _buildEmptyPaneState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.view_sidebar,
-            size: 48,
-            color: AppTheme.textSecondary.withValues(alpha: 0.5),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Drop a tab here',
-            style: TextStyle(
-              color: AppTheme.textSecondary.withValues(alpha: 0.8),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildHeader() {

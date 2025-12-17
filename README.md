@@ -30,7 +30,6 @@ MixTerm is a modern, feature-rich SSH and SFTP client designed for developers an
 ### Key Highlights
 
 - **Multi-tab Support**: Open multiple SSH/SFTP sessions simultaneously
-- **Split Pane View**: Work with two sessions side-by-side
 - **Secure Storage**: All credentials encrypted with AES-256
 - **Cloud Sync**: Sync server configurations via Google Drive
 - **Drag & Drop**: Upload files by dragging from desktop
@@ -59,15 +58,6 @@ MixTerm is a modern, feature-rich SSH and SFTP client designed for developers an
 | Quick Close | Middle-click or X button to close tabs |
 | Connection Status | Visual indicators for connected/disconnected state |
 
-### Split Pane
-
-| Feature | Description |
-|---------|-------------|
-| Vertical Split | Divide workspace into two panes |
-| Resizable Divider | Drag to adjust pane sizes |
-| Independent Panes | Each pane shows different tab content |
-| Double-click Reset | Double-click divider to reset 50/50 split |
-
 ### SFTP Features
 
 | Feature | Description |
@@ -79,15 +69,6 @@ MixTerm is a modern, feature-rich SSH and SFTP client designed for developers an
 | Rename Items | Rename files and directories |
 | Delete Items | Delete with confirmation dialog |
 | File Icons | Visual icons based on file type |
-
-### Local File Browser
-
-| Feature | Description |
-|---------|-------------|
-| Browse Local | Navigate local filesystem |
-| Drag to Upload | Drag local files to SFTP browser |
-| Path Navigation | Breadcrumb-style path bar |
-| File Selection | Select files for batch operations |
 
 ### Security
 
@@ -112,7 +93,7 @@ MixTerm is a modern, feature-rich SSH and SFTP client designed for developers an
 
 ```
 +---------------------------------------------------------------------+
-| [Server List]  |  [Tab1: SSH] [Tab2: SFTP] [Tab3: Local] [+]        |
+| [Server List]  |  [Tab1: SSH] [Tab2: SFTP] [+]                      |
 |                |-----------------------------------------------------|
 |  Production    |                                                     |
 |  * Web Server  |  user@server:~$                                    |
@@ -192,12 +173,6 @@ On first launch, you'll be prompted to create a master password. This password e
    - **SFTP Browser**: Opens file browser
 3. A new tab opens with your session
 
-### 4. Split View
-
-1. Open at least 2 tabs
-2. Click the split icon in the tab bar
-3. Drag the divider to resize panes
-
 ---
 
 ## User Guide
@@ -275,7 +250,6 @@ Right-click server -> Delete -> Confirm
 
 - Click server -> Choose SSH or SFTP
 - Each connection opens in new tab
-- Click "Local Files" for local browser
 
 #### Closing Tabs
 
@@ -287,26 +261,6 @@ Right-click server -> Delete -> Confirm
 
 - Drag tab to new position
 - Release to drop
-
-### Split Pane
-
-#### Enable Split View
-
-1. Have at least 2 tabs open
-2. Click split icon (vertical lines)
-3. View divides into two panes
-
-#### Using Split View
-
-- Left pane shows one tab
-- Right pane shows another tab
-- Click tabs to change pane content
-- Drag divider to resize
-
-#### Disable Split View
-
-- Click split icon again
-- Or close tabs until only 1 remains
 
 ### Settings
 
@@ -387,9 +341,7 @@ lib/
 |   |-- server_tile.dart         # Server list item
 |   |-- terminal_view.dart       # Terminal widget
 |   |-- sftp_browser.dart        # SFTP file browser
-|   |-- local_file_browser.dart  # Local file browser
 |   |-- session_tab_bar.dart     # Tab bar
-|   |-- split_pane.dart          # Split container
 |   +-- dialogs/                 # Dialog widgets
 |       |-- add_server_dialog.dart
 |       +-- master_password_dialog.dart
@@ -456,7 +408,7 @@ class Server {
 class TabSession {
   String id;          // Unique identifier
   String? serverId;   // Associated server
-  TabType type;       // ssh, sftp, or local
+  TabType type;       // ssh or sftp
   String title;       // Tab title
   String currentPath; // Current directory
   bool isConnected;   // Connection status
@@ -468,9 +420,6 @@ class TabSession {
 class TabProvider {
   List<TabSession> tabs;      // All open tabs
   String? activeTabId;        // Currently active tab
-  bool isSplitView;           // Split mode enabled
-  String? leftPaneTabId;      // Left pane content
-  String? rightPaneTabId;     // Right pane content
 
   // Terminal instances stored by tab ID
   Map<String, Terminal> terminals;
@@ -592,9 +541,9 @@ flutter test --name "Server Model"
 | Component | Tests | Coverage |
 |-----------|-------|----------|
 | Server Model | 27 | 100% |
-| TabSession Model | 26 | 100% |
-| TabProvider | 51 | 95% |
-| **Total** | **104** | - |
+| TabSession Model | 22 | 100% |
+| TabProvider | 35 | 100% |
+| **Total** | **84** | - |
 
 ---
 

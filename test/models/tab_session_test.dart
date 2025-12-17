@@ -26,16 +26,6 @@ void main() {
         expect(tab.title, 'SFTP Browser');
       });
 
-      test('creates local tab with default title', () {
-        final tab = TabSession(
-          type: TabType.local,
-        );
-
-        expect(tab.type, TabType.local);
-        expect(tab.title, 'Local Files');
-        expect(tab.serverId, isNull);
-      });
-
       test('accepts custom title', () {
         final tab = TabSession(
           serverId: 'server-1',
@@ -47,8 +37,8 @@ void main() {
       });
 
       test('generates unique IDs', () {
-        final tab1 = TabSession(type: TabType.local);
-        final tab2 = TabSession(type: TabType.local);
+        final tab1 = TabSession(type: TabType.ssh, serverId: 'server-1');
+        final tab2 = TabSession(type: TabType.ssh, serverId: 'server-2');
 
         expect(tab1.id, isNot(tab2.id));
       });
@@ -56,21 +46,23 @@ void main() {
       test('uses provided ID if given', () {
         final tab = TabSession(
           id: 'custom-tab-id',
-          type: TabType.local,
+          type: TabType.ssh,
+          serverId: 'server-1',
         );
 
         expect(tab.id, 'custom-tab-id');
       });
 
       test('sets default currentPath to /', () {
-        final tab = TabSession(type: TabType.local);
+        final tab = TabSession(type: TabType.sftp, serverId: 'server-1');
 
         expect(tab.currentPath, '/');
       });
 
       test('accepts custom currentPath', () {
         final tab = TabSession(
-          type: TabType.local,
+          type: TabType.sftp,
+          serverId: 'server-1',
           currentPath: '/home/user',
         );
 
@@ -88,7 +80,7 @@ void main() {
 
       test('sets createdAt automatically', () {
         final before = DateTime.now();
-        final tab = TabSession(type: TabType.local);
+        final tab = TabSession(type: TabType.ssh, serverId: 'server-1');
         final after = DateTime.now();
 
         expect(tab.createdAt.isAfter(before.subtract(const Duration(seconds: 1))), true);
@@ -174,7 +166,7 @@ void main() {
       });
 
       test('toJson handles null serverId', () {
-        final tab = TabSession(type: TabType.local);
+        final tab = TabSession(type: TabType.ssh);
 
         final json = tab.toJson();
 
@@ -228,19 +220,6 @@ void main() {
         expect(tab.type, TabType.sftp);
       });
 
-      test('fromJson handles local type', () {
-        final json = {
-          'id': 'local-tab',
-          'type': 2, // TabType.local.index
-          'title': 'Local Tab',
-          'currentPath': '/home',
-        };
-
-        final tab = TabSession.fromJson(json);
-
-        expect(tab.type, TabType.local);
-      });
-
       test('fromJson uses default currentPath when null', () {
         final json = {
           'id': 'default-path-tab',
@@ -255,17 +234,15 @@ void main() {
     });
 
     group('TabType Enum', () {
-      test('has ssh, sftp, and local values', () {
+      test('has ssh and sftp values', () {
         expect(TabType.values, contains(TabType.ssh));
         expect(TabType.values, contains(TabType.sftp));
-        expect(TabType.values, contains(TabType.local));
-        expect(TabType.values.length, 3);
+        expect(TabType.values.length, 2);
       });
 
       test('has correct indices', () {
         expect(TabType.ssh.index, 0);
         expect(TabType.sftp.index, 1);
-        expect(TabType.local.index, 2);
       });
     });
 
@@ -282,12 +259,6 @@ void main() {
         expect(tab.title, 'SFTP Browser');
       });
 
-      test('generates Local Files for local type', () {
-        final tab = TabSession(type: TabType.local);
-
-        expect(tab.title, 'Local Files');
-      });
-
       test('custom title overrides generated title', () {
         final tab = TabSession(
           type: TabType.ssh,
@@ -301,14 +272,14 @@ void main() {
 
     group('Mutable Fields', () {
       test('title can be modified', () {
-        final tab = TabSession(type: TabType.local);
+        final tab = TabSession(type: TabType.ssh, serverId: 'server-1');
         tab.title = 'Modified Title';
 
         expect(tab.title, 'Modified Title');
       });
 
       test('currentPath can be modified', () {
-        final tab = TabSession(type: TabType.local);
+        final tab = TabSession(type: TabType.sftp, serverId: 'server-1');
         tab.currentPath = '/new/path';
 
         expect(tab.currentPath, '/new/path');

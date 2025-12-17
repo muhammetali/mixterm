@@ -1,6 +1,6 @@
 import 'package:uuid/uuid.dart';
 
-enum TabType { ssh, sftp, local }
+enum TabType { ssh, sftp }
 
 class TabSession {
   final String id;
@@ -28,8 +28,6 @@ class TabSession {
         return 'SSH Terminal';
       case TabType.sftp:
         return 'SFTP Browser';
-      case TabType.local:
-        return 'Local Files';
     }
   }
 

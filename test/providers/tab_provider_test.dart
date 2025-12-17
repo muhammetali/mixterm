@@ -23,19 +23,6 @@ void main() {
         expect(tabProvider.activeTabId, isNull);
         expect(tabProvider.activeTab, isNull);
       });
-
-      test('starts with split view disabled', () {
-        expect(tabProvider.isSplitView, false);
-      });
-
-      test('starts with default split position', () {
-        expect(tabProvider.splitPosition, 0.5);
-      });
-
-      test('starts with no pane tabs', () {
-        expect(tabProvider.leftPaneTabId, isNull);
-        expect(tabProvider.rightPaneTabId, isNull);
-      });
     });
 
     group('addTab', () {
@@ -62,16 +49,6 @@ void main() {
         expect(tabProvider.tabs.first.type, TabType.sftp);
       });
 
-      test('adds local tab without serverId', () {
-        final tabId = tabProvider.addTab(
-          type: TabType.local,
-          title: 'Local Files',
-        );
-
-        expect(tabProvider.tabs.first.type, TabType.local);
-        expect(tabProvider.tabs.first.serverId, isNull);
-      });
-
       test('sets new tab as active', () {
         final tabId = tabProvider.addTab(
           type: TabType.ssh,
@@ -81,26 +58,17 @@ void main() {
         expect(tabProvider.activeTabId, tabId);
       });
 
-      test('sets first tab to left pane when not in split view', () {
-        final tabId = tabProvider.addTab(
-          type: TabType.ssh,
-          serverId: 'server-1',
-        );
-
-        expect(tabProvider.leftPaneTabId, tabId);
-      });
-
       test('adds multiple tabs', () {
         tabProvider.addTab(type: TabType.ssh, serverId: 'server-1');
         tabProvider.addTab(type: TabType.sftp, serverId: 'server-2');
-        tabProvider.addTab(type: TabType.local);
+        tabProvider.addTab(type: TabType.ssh, serverId: 'server-3');
 
         expect(tabProvider.tabs.length, 3);
       });
 
       test('returns unique tab ID', () {
-        final id1 = tabProvider.addTab(type: TabType.local);
-        final id2 = tabProvider.addTab(type: TabType.local);
+        final id1 = tabProvider.addTab(type: TabType.ssh, serverId: 'server-1');
+        final id2 = tabProvider.addTab(type: TabType.ssh, serverId: 'server-2');
 
         expect(id1, isNot(id2));
       });
@@ -109,7 +77,7 @@ void main() {
         var notified = false;
         tabProvider.addListener(() => notified = true);
 
-        tabProvider.addTab(type: TabType.local);
+        tabProvider.addTab(type: TabType.ssh, serverId: 'server-1');
 
         expect(notified, true);
       });
@@ -117,7 +85,7 @@ void main() {
 
     group('removeTab', () {
       test('removes existing tab', () {
-        final tabId = tabProvider.addTab(type: TabType.local);
+        final tabId = tabProvider.addTab(type: TabType.ssh, serverId: 'server-1');
         tabProvider.removeTab(tabId);
 
         expect(tabProvider.tabs, isEmpty);
@@ -130,8 +98,8 @@ void main() {
       });
 
       test('updates active tab when removing active tab', () {
-        final tab1 = tabProvider.addTab(type: TabType.local, title: 'Tab 1');
-        final tab2 = tabProvider.addTab(type: TabType.local, title: 'Tab 2');
+        final tab1 = tabProvider.addTab(type: TabType.ssh, serverId: 'server-1', title: 'Tab 1');
+        final tab2 = tabProvider.addTab(type: TabType.sftp, serverId: 'server-2', title: 'Tab 2');
 
         expect(tabProvider.activeTabId, tab2);
 
@@ -141,31 +109,10 @@ void main() {
       });
 
       test('sets active tab to null when removing last tab', () {
-        final tabId = tabProvider.addTab(type: TabType.local);
+        final tabId = tabProvider.addTab(type: TabType.ssh, serverId: 'server-1');
         tabProvider.removeTab(tabId);
 
         expect(tabProvider.activeTabId, isNull);
-      });
-
-      test('updates left pane when removing left pane tab', () {
-        final tab1 = tabProvider.addTab(type: TabType.local, title: 'Tab 1');
-        final tab2 = tabProvider.addTab(type: TabType.local, title: 'Tab 2');
-
-        tabProvider.removeTab(tab1);
-
-        expect(tabProvider.leftPaneTabId, tab2);
-      });
-
-      test('disables split view when less than 2 tabs remain', () {
-        final tab1 = tabProvider.addTab(type: TabType.local);
-        final tab2 = tabProvider.addTab(type: TabType.local);
-        tabProvider.toggleSplitView();
-
-        expect(tabProvider.isSplitView, true);
-
-        tabProvider.removeTab(tab2);
-
-        expect(tabProvider.isSplitView, false);
       });
 
       test('cleans up terminal resources', () {
@@ -184,7 +131,7 @@ void main() {
       });
 
       test('notifies listeners on remove', () {
-        final tabId = tabProvider.addTab(type: TabType.local);
+        final tabId = tabProvider.addTab(type: TabType.ssh, serverId: 'server-1');
         var notified = false;
         tabProvider.addListener(() => notified = true);
 
@@ -196,8 +143,8 @@ void main() {
 
     group('setActiveTab', () {
       test('sets active tab ID', () {
-        final tab1 = tabProvider.addTab(type: TabType.local, title: 'Tab 1');
-        final tab2 = tabProvider.addTab(type: TabType.local, title: 'Tab 2');
+        final tab1 = tabProvider.addTab(type: TabType.ssh, serverId: 'server-1', title: 'Tab 1');
+        final tab2 = tabProvider.addTab(type: TabType.sftp, serverId: 'server-2', title: 'Tab 2');
 
         tabProvider.setActiveTab(tab1);
 
@@ -205,15 +152,15 @@ void main() {
       });
 
       test('ignores invalid tab ID', () {
-        final tab1 = tabProvider.addTab(type: TabType.local);
+        final tab1 = tabProvider.addTab(type: TabType.ssh, serverId: 'server-1');
         tabProvider.setActiveTab('invalid-id');
 
         expect(tabProvider.activeTabId, tab1);
       });
 
       test('notifies listeners', () {
-        final tab1 = tabProvider.addTab(type: TabType.local, title: 'Tab 1');
-        final tab2 = tabProvider.addTab(type: TabType.local, title: 'Tab 2');
+        final tab1 = tabProvider.addTab(type: TabType.ssh, serverId: 'server-1', title: 'Tab 1');
+        final tab2 = tabProvider.addTab(type: TabType.sftp, serverId: 'server-2', title: 'Tab 2');
         var notified = false;
         tabProvider.addListener(() => notified = true);
 
@@ -247,7 +194,8 @@ void main() {
     group('updateTabTitle', () {
       test('updates tab title', () {
         final tabId = tabProvider.addTab(
-          type: TabType.local,
+          type: TabType.ssh,
+          serverId: 'server-1',
           title: 'Original',
         );
 
@@ -262,7 +210,7 @@ void main() {
       });
 
       test('notifies listeners', () {
-        final tabId = tabProvider.addTab(type: TabType.local);
+        final tabId = tabProvider.addTab(type: TabType.ssh, serverId: 'server-1');
         var notified = false;
         tabProvider.addListener(() => notified = true);
 
@@ -298,7 +246,7 @@ void main() {
 
     group('updateTabPath', () {
       test('updates current path', () {
-        final tabId = tabProvider.addTab(type: TabType.local);
+        final tabId = tabProvider.addTab(type: TabType.sftp, serverId: 'server-1');
 
         tabProvider.updateTabPath(tabId, '/home/user');
 
@@ -308,9 +256,9 @@ void main() {
 
     group('reorderTabs', () {
       test('moves tab forward', () {
-        final tab1 = tabProvider.addTab(type: TabType.local, title: 'Tab 1');
-        final tab2 = tabProvider.addTab(type: TabType.local, title: 'Tab 2');
-        final tab3 = tabProvider.addTab(type: TabType.local, title: 'Tab 3');
+        final tab1 = tabProvider.addTab(type: TabType.ssh, serverId: 'server-1', title: 'Tab 1');
+        final tab2 = tabProvider.addTab(type: TabType.sftp, serverId: 'server-2', title: 'Tab 2');
+        final tab3 = tabProvider.addTab(type: TabType.ssh, serverId: 'server-3', title: 'Tab 3');
 
         tabProvider.reorderTabs(0, 2);
 
@@ -320,9 +268,9 @@ void main() {
       });
 
       test('moves tab backward', () {
-        final tab1 = tabProvider.addTab(type: TabType.local, title: 'Tab 1');
-        final tab2 = tabProvider.addTab(type: TabType.local, title: 'Tab 2');
-        final tab3 = tabProvider.addTab(type: TabType.local, title: 'Tab 3');
+        final tab1 = tabProvider.addTab(type: TabType.ssh, serverId: 'server-1', title: 'Tab 1');
+        final tab2 = tabProvider.addTab(type: TabType.sftp, serverId: 'server-2', title: 'Tab 2');
+        final tab3 = tabProvider.addTab(type: TabType.ssh, serverId: 'server-3', title: 'Tab 3');
 
         tabProvider.reorderTabs(2, 0);
 
@@ -332,88 +280,14 @@ void main() {
       });
 
       test('notifies listeners', () {
-        tabProvider.addTab(type: TabType.local, title: 'Tab 1');
-        tabProvider.addTab(type: TabType.local, title: 'Tab 2');
+        tabProvider.addTab(type: TabType.ssh, serverId: 'server-1', title: 'Tab 1');
+        tabProvider.addTab(type: TabType.sftp, serverId: 'server-2', title: 'Tab 2');
         var notified = false;
         tabProvider.addListener(() => notified = true);
 
         tabProvider.reorderTabs(0, 1);
 
         expect(notified, true);
-      });
-    });
-
-    group('Split View', () {
-      test('toggleSplitView enables split view', () {
-        tabProvider.addTab(type: TabType.local, title: 'Tab 1');
-        tabProvider.addTab(type: TabType.local, title: 'Tab 2');
-
-        tabProvider.toggleSplitView();
-
-        expect(tabProvider.isSplitView, true);
-      });
-
-      test('toggleSplitView disables split view', () {
-        tabProvider.addTab(type: TabType.local, title: 'Tab 1');
-        tabProvider.addTab(type: TabType.local, title: 'Tab 2');
-        tabProvider.toggleSplitView();
-        tabProvider.toggleSplitView();
-
-        expect(tabProvider.isSplitView, false);
-      });
-
-      test('toggleSplitView requires at least 2 tabs', () {
-        tabProvider.addTab(type: TabType.local);
-
-        tabProvider.toggleSplitView();
-
-        expect(tabProvider.isSplitView, false);
-      });
-
-      test('toggleSplitView sets pane tabs', () {
-        final tab1 = tabProvider.addTab(type: TabType.local, title: 'Tab 1');
-        final tab2 = tabProvider.addTab(type: TabType.local, title: 'Tab 2');
-
-        tabProvider.toggleSplitView();
-
-        expect(tabProvider.leftPaneTabId, tab1);
-        expect(tabProvider.rightPaneTabId, tab2);
-      });
-
-      test('setSplitPosition updates position', () {
-        tabProvider.setSplitPosition(0.3);
-
-        expect(tabProvider.splitPosition, 0.3);
-      });
-
-      test('setSplitPosition clamps to valid range', () {
-        tabProvider.setSplitPosition(0.1);
-        expect(tabProvider.splitPosition, 0.2);
-
-        tabProvider.setSplitPosition(0.9);
-        expect(tabProvider.splitPosition, 0.8);
-      });
-
-      test('setLeftPaneTab updates left pane', () {
-        final tab1 = tabProvider.addTab(type: TabType.local, title: 'Tab 1');
-        final tab2 = tabProvider.addTab(type: TabType.local, title: 'Tab 2');
-        final tab3 = tabProvider.addTab(type: TabType.local, title: 'Tab 3');
-
-        tabProvider.setLeftPaneTab(tab3);
-
-        expect(tabProvider.leftPaneTabId, tab3);
-        expect(tabProvider.activeTabId, tab3);
-      });
-
-      test('setRightPaneTab updates right pane', () {
-        final tab1 = tabProvider.addTab(type: TabType.local, title: 'Tab 1');
-        final tab2 = tabProvider.addTab(type: TabType.local, title: 'Tab 2');
-        final tab3 = tabProvider.addTab(type: TabType.local, title: 'Tab 3');
-
-        tabProvider.setRightPaneTab(tab1);
-
-        expect(tabProvider.rightPaneTabId, tab1);
-        expect(tabProvider.activeTabId, tab1);
       });
     });
 
@@ -460,20 +334,10 @@ void main() {
       });
     });
 
-    group('openLocalFileBrowser', () {
-      test('creates local file browser tab', () {
-        tabProvider.openLocalFileBrowser();
-
-        expect(tabProvider.tabs.length, 1);
-        expect(tabProvider.tabs.first.type, TabType.local);
-        expect(tabProvider.tabs.first.title, 'Local Files');
-      });
-    });
-
     group('activeTab getter', () {
       test('returns active tab session', () {
-        tabProvider.addTab(type: TabType.local, title: 'Tab 1');
-        final tab2 = tabProvider.addTab(type: TabType.local, title: 'Tab 2');
+        tabProvider.addTab(type: TabType.ssh, serverId: 'server-1', title: 'Tab 1');
+        final tab2 = tabProvider.addTab(type: TabType.sftp, serverId: 'server-2', title: 'Tab 2');
 
         final activeTab = tabProvider.activeTab;
 
@@ -488,10 +352,10 @@ void main() {
 
     group('tabs list immutability', () {
       test('returns unmodifiable list', () {
-        tabProvider.addTab(type: TabType.local);
+        tabProvider.addTab(type: TabType.ssh, serverId: 'server-1');
 
         expect(
-          () => tabProvider.tabs.add(TabSession(type: TabType.local)),
+          () => tabProvider.tabs.add(TabSession(type: TabType.ssh, serverId: 'server-2')),
           throwsUnsupportedError,
         );
       });

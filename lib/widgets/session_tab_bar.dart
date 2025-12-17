@@ -61,38 +61,8 @@ class SessionTabBar extends StatelessWidget {
   }
 
   Widget _buildActions(BuildContext context, TabProvider tabProvider) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const VerticalDivider(width: 1),
-        Tooltip(
-          message: tabProvider.isSplitView ? 'Unsplit View' : 'Split View',
-          child: IconButton(
-            icon: Icon(
-              tabProvider.isSplitView
-                  ? Icons.view_agenda
-                  : Icons.vertical_split,
-              size: 18,
-            ),
-            onPressed: tabProvider.tabs.length >= 2
-                ? tabProvider.toggleSplitView
-                : null,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            constraints: const BoxConstraints(),
-          ),
-        ),
-        Tooltip(
-          message: 'Open Local Files',
-          child: IconButton(
-            icon: const Icon(Icons.folder_open, size: 18),
-            onPressed: () => tabProvider.openLocalFileBrowser(),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            constraints: const BoxConstraints(),
-          ),
-        ),
-        const SizedBox(width: 8),
-      ],
-    );
+    // No additional actions needed - tabs are self-contained
+    return const SizedBox(width: 8);
   }
 }
 
@@ -186,8 +156,6 @@ class _TabItem extends StatelessWidget {
         return Icons.terminal;
       case TabType.sftp:
         return Icons.folder;
-      case TabType.local:
-        return Icons.computer;
     }
   }
 }
