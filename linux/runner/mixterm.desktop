@@ -7,4 +7,4 @@ Terminal=false
 Type=Application
 Categories=Network;RemoteAccess;System;
 Keywords=ssh;sftp;terminal;remote;server;
-StartupWMClass=mixterm
+StartupWMClass=com.mixterm.mixterm

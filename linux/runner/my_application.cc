@@ -56,15 +56,15 @@ static void my_application_activate(GApplication* application) {
 
   gtk_window_set_default_size(window, 1280, 720);
 
-  // Set window icon
-  g_autoptr(GError) icon_error = nullptr;
+  // Set window icon - find icon relative to executable
   g_autofree gchar* exe_path = g_file_read_link("/proc/self/exe", nullptr);
   if (exe_path != nullptr) {
     g_autofree gchar* exe_dir = g_path_get_dirname(exe_path);
     g_autofree gchar* icon_path = g_build_filename(exe_dir, "data", "mixterm.png", nullptr);
-    GdkPixbuf* icon = gdk_pixbuf_new_from_file(icon_path, &icon_error);
+    GdkPixbuf* icon = gdk_pixbuf_new_from_file(icon_path, nullptr);
     if (icon != nullptr) {
       gtk_window_set_icon(window, icon);
+      gtk_window_set_default_icon(icon);
       g_object_unref(icon);
     }
   }
