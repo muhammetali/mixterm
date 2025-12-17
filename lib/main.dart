@@ -7,6 +7,7 @@ import 'services/sync_service.dart';
 import 'providers/server_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/connection_provider.dart';
+import 'providers/tab_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +31,9 @@ void main() async {
         ),
         ChangeNotifierProvider<ConnectionProvider>(
           create: (_) => ConnectionProvider(),
+        ),
+        ChangeNotifierProvider<TabProvider>(
+          create: (_) => TabProvider(),
         ),
       ],
       child: const MixTermApp(),

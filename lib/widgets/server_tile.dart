@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/server.dart';
+import '../models/tab_session.dart';
 import '../providers/server_provider.dart';
 import '../providers/connection_provider.dart';
+import '../providers/tab_provider.dart';
 import '../utils/theme.dart';
 import 'dialogs/add_server_dialog.dart';
 
@@ -17,19 +19,12 @@ class ServerTile extends StatelessWidget {
       builder: (context, connectionProvider, _) {
         final isSSHConnected = connectionProvider.isSSHConnected(server.id);
         final isSFTPConnected = connectionProvider.isSFTPConnected(server.id);
-        final isActive = connectionProvider.activeServerId == server.id;
 
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
-            color: isActive
-                ? AppTheme.primaryColor.withOpacity(0.1)
-                : Colors.transparent,
+            color: Colors.transparent,
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: isActive ? AppTheme.primaryColor : Colors.transparent,
-              width: 1,
-            ),
           ),
           child: Material(
             color: Colors.transparent,
@@ -88,7 +83,7 @@ class ServerTile extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppTheme.successColor.withOpacity(0.2),
+                          color: AppTheme.successColor.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: const Text(
@@ -108,7 +103,7 @@ class ServerTile extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withOpacity(0.2),
+                          color: AppTheme.primaryColor.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: const Text(
@@ -136,7 +131,7 @@ class ServerTile extends StatelessWidget {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(server.name),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -146,11 +141,11 @@ class ServerTile extends StatelessWidget {
               title: const Text('SSH Terminal'),
               subtitle: Text(
                 connectionProvider.isSSHConnected(server.id)
-                    ? 'Connected'
+                    ? 'Connected - Open new tab'
                     : 'Click to connect',
               ),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
                 _connectSSH(context);
               },
             ),
@@ -159,11 +154,11 @@ class ServerTile extends StatelessWidget {
               title: const Text('SFTP File Browser'),
               subtitle: Text(
                 connectionProvider.isSFTPConnected(server.id)
-                    ? 'Connected'
+                    ? 'Connected - Open new tab'
                     : 'Click to connect',
               ),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
                 _connectSFTP(context);
               },
             ),
@@ -171,7 +166,7 @@ class ServerTile extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
         ],
@@ -181,10 +176,19 @@ class ServerTile extends StatelessWidget {
 
   Future<void> _connectSSH(BuildContext context) async {
     final connectionProvider = context.read<ConnectionProvider>();
+    final tabProvider = context.read<TabProvider>();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
+    // Create a new tab first
+    final tabId = tabProvider.addTab(
+      type: TabType.ssh,
+      serverId: server.id,
+      title: '${server.name} - SSH',
+    );
+
     if (connectionProvider.isSSHConnected(server.id)) {
-      connectionProvider.setActive(server.id, 'ssh');
+      // Already connected, just update tab connection status
+      tabProvider.updateTabConnection(tabId, true);
       return;
     }
 
@@ -197,6 +201,7 @@ class ServerTile extends StatelessWidget {
     scaffoldMessenger.hideCurrentSnackBar();
 
     if (result.success) {
+      tabProvider.updateTabConnection(tabId, true);
       scaffoldMessenger.showSnackBar(
         const SnackBar(
           content: Text('Connected'),
@@ -204,6 +209,8 @@ class ServerTile extends StatelessWidget {
         ),
       );
     } else {
+      // Remove tab on failed connection
+      tabProvider.removeTab(tabId);
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(result.error ?? 'Connection failed'),
@@ -216,10 +223,19 @@ class ServerTile extends StatelessWidget {
 
   Future<void> _connectSFTP(BuildContext context) async {
     final connectionProvider = context.read<ConnectionProvider>();
+    final tabProvider = context.read<TabProvider>();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
+    // Create a new tab first
+    final tabId = tabProvider.addTab(
+      type: TabType.sftp,
+      serverId: server.id,
+      title: '${server.name} - SFTP',
+    );
+
     if (connectionProvider.isSFTPConnected(server.id)) {
-      connectionProvider.setActive(server.id, 'sftp');
+      // Already connected, just update tab connection status
+      tabProvider.updateTabConnection(tabId, true);
       return;
     }
 
@@ -232,6 +248,7 @@ class ServerTile extends StatelessWidget {
     scaffoldMessenger.hideCurrentSnackBar();
 
     if (result.success) {
+      tabProvider.updateTabConnection(tabId, true);
       scaffoldMessenger.showSnackBar(
         const SnackBar(
           content: Text('Connected'),
@@ -239,6 +256,8 @@ class ServerTile extends StatelessWidget {
         ),
       );
     } else {
+      // Remove tab on failed connection
+      tabProvider.removeTab(tabId);
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(result.error ?? 'Connection failed'),
@@ -330,12 +349,12 @@ class ServerTile extends StatelessWidget {
   void _deleteServer(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Server'),
         content: Text('Are you sure you want to delete "${server.name}"?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
@@ -344,7 +363,7 @@ class ServerTile extends StatelessWidget {
               final connectionProvider = context.read<ConnectionProvider>();
               connectionProvider.disconnectAll(server.id);
               serverProvider.deleteServer(server.id);
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.errorColor,

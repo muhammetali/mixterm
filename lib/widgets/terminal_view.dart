@@ -5,39 +5,50 @@ import 'package:xterm/xterm.dart';
 import '../providers/connection_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/server_provider.dart';
+import '../providers/tab_provider.dart';
 import '../services/ssh_service.dart';
 import '../utils/theme.dart';
 
 class TerminalViewWidget extends StatefulWidget {
   final String serverId;
+  final String tabId;
 
-  const TerminalViewWidget({super.key, required this.serverId});
+  const TerminalViewWidget({
+    super.key,
+    required this.serverId,
+    required this.tabId,
+  });
 
   @override
   State<TerminalViewWidget> createState() => _TerminalViewWidgetState();
 }
 
 class _TerminalViewWidgetState extends State<TerminalViewWidget> {
-  late Terminal _terminal;
-  late TerminalController _terminalController;
+  Terminal? _terminal;
+  TerminalController? _terminalController;
   SSHService? _sshService;
   bool _isConnected = false;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _terminal = Terminal(
-      maxLines: 10000,
-    );
-    _terminalController = TerminalController();
+    _initTerminal();
+  }
 
-    // Terminal girişini SSH'a gönder
-    _terminal.onOutput = (data) {
+  void _initTerminal() {
+    final tabProvider = context.read<TabProvider>();
+
+    // Get or create terminal from TabProvider
+    _terminal = tabProvider.getOrCreateTerminal(widget.tabId);
+    _terminalController = tabProvider.getTerminalController(widget.tabId);
+
+    // Set up terminal callbacks
+    _terminal!.onOutput = (data) {
       _sshService?.write(data);
     };
 
-    // Terminal boyut değişikliğini SSH'a bildir
-    _terminal.onResize = (width, height, pixelWidth, pixelHeight) {
+    _terminal!.onResize = (width, height, pixelWidth, pixelHeight) {
       _sshService?.resize(width, height);
     };
 
@@ -46,18 +57,27 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
 
   void _initConnection() {
     final connectionProvider = context.read<ConnectionProvider>();
+    final tabProvider = context.read<TabProvider>();
+
     _sshService = connectionProvider.getSSHConnection(widget.serverId);
 
     if (_sshService != null && _sshService!.isConnected) {
       _isConnected = true;
-      _sshService!.outputStream.listen((data) {
-        _terminal.write(data);
-      });
+      tabProvider.updateTabConnection(widget.tabId, true);
+
+      if (!_isInitialized) {
+        _sshService!.outputStream.listen((data) {
+          _terminal?.write(data);
+        });
+        _isInitialized = true;
+      }
+
       _sshService!.stateStream.listen((state) {
-        if (state == SSHConnectionState.disconnected) {
+        if (state == SSHConnectionState.disconnected && mounted) {
           setState(() {
             _isConnected = false;
           });
+          tabProvider.updateTabConnection(widget.tabId, false);
         }
       });
     }
@@ -65,7 +85,7 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
 
   @override
   void dispose() {
-    _terminalController.dispose();
+    // Don't dispose terminal controller - it's managed by TabProvider
     super.dispose();
   }
 
@@ -75,13 +95,17 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
     final serverProvider = context.read<ServerProvider>();
     final server = serverProvider.getServer(widget.serverId);
 
+    if (_terminal == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return Column(
       children: [
         _buildToolbar(server?.name ?? 'Terminal'),
         Expanded(
           child: Container(
             color: AppTheme.terminalBackground
-                .withOpacity(settings.terminalOpacity),
+                .withValues(alpha: settings.terminalOpacity),
             child: Listener(
               onPointerDown: (event) {
                 if (event.buttons == 2 && settings.pasteOnRightClick) {
@@ -89,7 +113,7 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
                 }
               },
               child: TerminalView(
-                _terminal,
+                _terminal!,
                 controller: _terminalController,
                 theme: _buildTerminalTheme(),
                 autofocus: true,
@@ -153,7 +177,9 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
             tooltip: 'Disconnect',
             onPressed: () {
               final connectionProvider = context.read<ConnectionProvider>();
+              final tabProvider = context.read<TabProvider>();
               connectionProvider.disconnectSSH(widget.serverId);
+              tabProvider.removeTab(widget.tabId);
             },
           ),
         ],

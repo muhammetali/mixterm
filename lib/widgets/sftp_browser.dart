@@ -3,14 +3,21 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dartssh2/dartssh2.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import '../providers/connection_provider.dart';
 import '../providers/server_provider.dart';
+import '../providers/tab_provider.dart';
 import '../utils/theme.dart';
 
 class SFTPBrowser extends StatefulWidget {
   final String serverId;
+  final String tabId;
 
-  const SFTPBrowser({super.key, required this.serverId});
+  const SFTPBrowser({
+    super.key,
+    required this.serverId,
+    required this.tabId,
+  });
 
   @override
   State<SFTPBrowser> createState() => _SFTPBrowserState();
@@ -21,6 +28,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
   List<SftpName> _items = [];
   bool _isLoading = true;
   String? _error;
+  bool _isDragging = false;
 
   @override
   void initState() {
@@ -35,6 +43,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     });
 
     final connectionProvider = context.read<ConnectionProvider>();
+    final tabProvider = context.read<TabProvider>();
     final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
 
     if (sftpService == null || !sftpService.isConnected) {
@@ -54,6 +63,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
           _currentPath = dir;
         }
       }
+
+      tabProvider.updateTabPath(widget.tabId, _currentPath);
 
       final items = await sftpService.listDirectory(_currentPath);
       setState(() {
@@ -90,6 +101,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
   Future<void> _downloadFile(String filename) async {
     final connectionProvider = context.read<ConnectionProvider>();
     final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     if (sftpService == null) return;
 
@@ -99,14 +111,14 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     final localPath = '${downloadDir.path}/$filename';
     final remotePath = _getFullPath(filename);
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    scaffoldMessenger.showSnackBar(
       SnackBar(content: Text('Downloading $filename...')),
     );
 
     final success = await sftpService.downloadFile(remotePath, localPath);
 
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
+    scaffoldMessenger.hideCurrentSnackBar();
+    scaffoldMessenger.showSnackBar(
       SnackBar(
         content: Text(
           success ? 'Downloaded to $localPath' : 'Download failed',
@@ -117,38 +129,63 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
   }
 
   Future<void> _uploadFile() async {
-    final result = await FilePicker.platform.pickFiles();
+    final result = await FilePicker.platform.pickFiles(allowMultiple: true);
     if (result == null || result.files.isEmpty) return;
 
-    final file = result.files.first;
-    if (file.path == null) return;
+    await _uploadFiles(result.files.map((f) => f.path!).toList());
+  }
 
+  Future<void> _uploadFiles(List<String> filePaths) async {
     final connectionProvider = context.read<ConnectionProvider>();
     final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     if (sftpService == null) return;
 
-    final remotePath = _getFullPath(file.name);
+    int successCount = 0;
+    int failCount = 0;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Uploading ${file.name}...')),
-    );
+    for (final filePath in filePaths) {
+      final fileName = filePath.split('/').last;
+      final remotePath = _getFullPath(fileName);
 
-    final success = await sftpService.uploadFile(file.path!, remotePath);
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('Uploading $fileName...')),
+      );
 
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
+      final success = await sftpService.uploadFile(filePath, remotePath);
+      if (success) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    }
+
+    scaffoldMessenger.hideCurrentSnackBar();
+    scaffoldMessenger.showSnackBar(
       SnackBar(
         content: Text(
-          success ? 'Uploaded ${file.name}' : 'Upload failed',
+          failCount == 0
+              ? 'Uploaded $successCount file(s)'
+              : 'Uploaded $successCount, failed $failCount file(s)',
         ),
-        backgroundColor: success ? AppTheme.successColor : AppTheme.errorColor,
+        backgroundColor: failCount == 0 ? AppTheme.successColor : AppTheme.warningColor,
       ),
     );
 
-    if (success) {
-      _loadDirectory();
+    _loadDirectory();
+  }
+
+  Future<void> _handleDroppedFiles(DropDoneDetails details) async {
+    final files = details.files;
+    if (files.isEmpty) return;
+
+    final filePaths = <String>[];
+    for (final file in files) {
+      filePaths.add(file.path);
     }
+
+    await _uploadFiles(filePaths);
   }
 
   Future<void> _createDirectory() async {
@@ -182,6 +219,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
 
     final connectionProvider = context.read<ConnectionProvider>();
     final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     if (sftpService == null) return;
 
@@ -190,9 +228,61 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     if (success) {
       _loadDirectory();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(
           content: Text('Failed to create directory'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+  }
+
+  Future<void> _renameItem(String oldName, bool isDirectory) async {
+    final controller = TextEditingController(text: oldName);
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rename'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'New name',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
+
+    if (newName == null || newName.isEmpty || newName == oldName) return;
+
+    final connectionProvider = context.read<ConnectionProvider>();
+    final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    if (sftpService == null) return;
+
+    final success = await sftpService.rename(
+      _getFullPath(oldName),
+      _getFullPath(newName),
+    );
+
+    if (success) {
+      _loadDirectory();
+    } else {
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text('Failed to rename'),
           backgroundColor: AppTheme.errorColor,
         ),
       );
@@ -225,6 +315,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
 
     final connectionProvider = context.read<ConnectionProvider>();
     final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     if (sftpService == null) return;
 
@@ -236,7 +327,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     if (success) {
       _loadDirectory();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(
           content: Text('Failed to delete'),
           backgroundColor: AppTheme.errorColor,
@@ -255,7 +346,48 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
         _buildToolbar(server?.name ?? 'SFTP'),
         _buildPathBar(),
         Expanded(
-          child: _buildContent(),
+          child: DropTarget(
+            onDragEntered: (details) {
+              setState(() => _isDragging = true);
+            },
+            onDragExited: (details) {
+              setState(() => _isDragging = false);
+            },
+            onDragDone: (details) {
+              setState(() => _isDragging = false);
+              _handleDroppedFiles(details);
+            },
+            child: Stack(
+              children: [
+                _buildContent(),
+                if (_isDragging)
+                  Container(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                    child: const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.cloud_upload,
+                            size: 64,
+                            color: AppTheme.primaryColor,
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            'Drop files here to upload',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: AppTheme.primaryColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -303,7 +435,9 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
             tooltip: 'Disconnect',
             onPressed: () {
               final connectionProvider = context.read<ConnectionProvider>();
+              final tabProvider = context.read<TabProvider>();
               connectionProvider.disconnectSFTP(widget.serverId);
+              tabProvider.removeTab(widget.tabId);
             },
           ),
         ],
@@ -402,9 +536,21 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
 
     if (_items.isEmpty) {
       return const Center(
-        child: Text(
-          'Empty directory',
-          style: TextStyle(color: AppTheme.textSecondary),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.folder_open, size: 48, color: AppTheme.textSecondary),
+            SizedBox(height: 16),
+            Text(
+              'Empty directory',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Drop files here to upload',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+            ),
+          ],
         ),
       );
     }
@@ -413,58 +559,209 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
       itemCount: _items.length,
       itemBuilder: (context, index) {
         final item = _items[index];
-        final isDir = item.attr.isDirectory;
+        return _buildFileItem(item);
+      },
+    );
+  }
 
-        return ListTile(
-          leading: Icon(
-            isDir ? Icons.folder : _getFileIcon(item.filename),
-            color: isDir ? AppTheme.primaryColor : AppTheme.textSecondary,
+  Widget _buildFileItem(SftpName item) {
+    final isDir = item.attr.isDirectory;
+    final filename = item.filename;
+
+    return Draggable<Map<String, dynamic>>(
+      data: {
+        'type': 'sftp',
+        'serverId': widget.serverId,
+        'path': _getFullPath(filename),
+        'filename': filename,
+        'isDirectory': isDir,
+      },
+      feedback: Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryColor.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(4),
           ),
-          title: Text(item.filename),
-          subtitle: Text(
-            _formatSize(item.attr.size ?? 0),
-            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isDir ? Icons.folder : Icons.insert_drive_file,
+                size: 16,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                filename,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ],
           ),
-          onTap: () {
-            if (isDir) {
-              _navigateTo(_getFullPath(item.filename));
-            }
-          },
-          trailing: PopupMenuButton(
-            itemBuilder: (context) => [
-              if (!isDir)
-                const PopupMenuItem(
-                  value: 'download',
-                  child: Row(
-                    children: [
-                      Icon(Icons.download, size: 18),
-                      SizedBox(width: 8),
-                      Text('Download'),
-                    ],
-                  ),
-                ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
+        ),
+      ),
+      child: InkWell(
+        onTap: () {
+          if (isDir) {
+            _navigateTo(_getFullPath(filename));
+          }
+        },
+        onSecondaryTapDown: (details) {
+          _showContextMenu(context, item, details.globalPosition);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              Icon(
+                isDir ? Icons.folder : _getFileIcon(filename),
+                size: 20,
+                color: isDir ? AppTheme.primaryColor : AppTheme.textSecondary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.delete, size: 18, color: AppTheme.errorColor),
-                    SizedBox(width: 8),
-                    Text('Delete', style: TextStyle(color: AppTheme.errorColor)),
+                    Text(
+                      filename,
+                      style: const TextStyle(
+                        color: AppTheme.textColor,
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      _formatSize(item.attr.size ?? 0),
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
                   ],
                 ),
               ),
+              PopupMenuButton(
+                icon: const Icon(Icons.more_vert, size: 18),
+                itemBuilder: (context) => [
+                  if (!isDir)
+                    const PopupMenuItem(
+                      value: 'download',
+                      child: Row(
+                        children: [
+                          Icon(Icons.download, size: 18),
+                          SizedBox(width: 8),
+                          Text('Download'),
+                        ],
+                      ),
+                    ),
+                  const PopupMenuItem(
+                    value: 'rename',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Rename'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: AppTheme.errorColor),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: AppTheme.errorColor)),
+                      ],
+                    ),
+                  ),
+                ],
+                onSelected: (value) {
+                  if (value == 'download') {
+                    _downloadFile(filename);
+                  } else if (value == 'rename') {
+                    _renameItem(filename, isDir);
+                  } else if (value == 'delete') {
+                    _deleteItem(filename, isDir);
+                  }
+                },
+              ),
             ],
-            onSelected: (value) {
-              if (value == 'download') {
-                _downloadFile(item.filename);
-              } else if (value == 'delete') {
-                _deleteItem(item.filename, isDir);
-              }
-            },
           ),
-        );
-      },
+        ),
+      ),
     );
+  }
+
+  void _showContextMenu(BuildContext context, SftpName item, Offset position) {
+    final isDir = item.attr.isDirectory;
+    final filename = item.filename;
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx,
+        position.dy,
+      ),
+      items: <PopupMenuEntry<String>>[
+        if (isDir)
+          const PopupMenuItem<String>(
+            value: 'open',
+            child: Row(
+              children: [
+                Icon(Icons.folder_open, size: 18),
+                SizedBox(width: 8),
+                Text('Open'),
+              ],
+            ),
+          ),
+        if (!isDir)
+          const PopupMenuItem<String>(
+            value: 'download',
+            child: Row(
+              children: [
+                Icon(Icons.download, size: 18),
+                SizedBox(width: 8),
+                Text('Download'),
+              ],
+            ),
+          ),
+        const PopupMenuItem<String>(
+          value: 'rename',
+          child: Row(
+            children: [
+              Icon(Icons.edit, size: 18),
+              SizedBox(width: 8),
+              Text('Rename'),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete, size: 18, color: AppTheme.errorColor),
+              SizedBox(width: 8),
+              Text('Delete', style: TextStyle(color: AppTheme.errorColor)),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'open') {
+        _navigateTo(_getFullPath(filename));
+      } else if (value == 'download') {
+        _downloadFile(filename);
+      } else if (value == 'rename') {
+        _renameItem(filename, isDir);
+      } else if (value == 'delete') {
+        _deleteItem(filename, isDir);
+      }
+    });
   }
 
   IconData _getFileIcon(String filename) {
