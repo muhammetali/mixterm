@@ -1,0 +1,57 @@
+name: mixterm
+description: "Termius-like SSH/SFTP client for Linux and macOS"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # SSH/SFTP
+  dartssh2: ^2.9.0
+
+  # Terminal
+  xterm: ^4.0.0
+
+  # Google Auth & Drive
+  googleapis: ^13.2.0
+  googleapis_auth: ^1.6.0
+  http: ^1.2.0
+
+  # Encryption
+  encrypt: ^5.0.3
+  crypto: ^3.0.3
+  pointycastle: ^3.9.1
+
+  # State Management
+  provider: ^6.1.2
+
+  # Storage
+  shared_preferences: ^2.3.3
+  path_provider: ^2.1.5
+
+  # Utils
+  uuid: ^4.5.1
+  intl: ^0.19.0
+  file_picker: ^8.1.6
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700
