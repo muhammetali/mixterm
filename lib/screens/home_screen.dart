@@ -24,6 +24,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
+  final Map<String, Widget> _tabWidgetCache = {};
 
   @override
   void initState() {
@@ -143,56 +144,87 @@ class _HomeScreenState extends State<HomeScreen> {
     return Consumer<TabProvider>(
       builder: (context, tabProvider, _) {
         if (tabProvider.tabs.isEmpty) {
+          _tabWidgetCache.clear();
           return _buildEmptyState();
         }
 
+        // Clean up cache for removed tabs
+        final tabIds = tabProvider.tabs.map((t) => t.id).toSet();
+        _tabWidgetCache.removeWhere((key, _) => !tabIds.contains(key));
+
         if (tabProvider.isSplitView) {
           return SplitPane(
+            key: ValueKey('split_${tabProvider.leftPaneTabId}_${tabProvider.rightPaneTabId}'),
             initialPosition: tabProvider.splitPosition,
             onPositionChanged: tabProvider.setSplitPosition,
-            leftPane: _buildPaneContent(tabProvider.leftPaneTabId),
-            rightPane: _buildPaneContent(tabProvider.rightPaneTabId),
+            leftPane: KeyedSubtree(
+              key: ValueKey('left_pane_${tabProvider.leftPaneTabId}'),
+              child: _buildPaneContent(tabProvider.leftPaneTabId, tabProvider),
+            ),
+            rightPane: KeyedSubtree(
+              key: ValueKey('right_pane_${tabProvider.rightPaneTabId}'),
+              child: _buildPaneContent(tabProvider.rightPaneTabId, tabProvider),
+            ),
           );
         }
 
-        return _buildPaneContent(tabProvider.activeTabId);
+        // Use Stack with Offstage to keep all tabs alive but only show active
+        return Stack(
+          children: tabProvider.tabs.map((tab) {
+            final isActive = tab.id == tabProvider.activeTabId;
+            return Offstage(
+              offstage: !isActive,
+              child: _getOrCreateTabWidget(tab, tabProvider),
+            );
+          }).toList(),
+        );
       },
     );
   }
 
-  Widget _buildPaneContent(String? tabId) {
+  Widget _getOrCreateTabWidget(TabSession tab, TabProvider tabProvider) {
+    if (!_tabWidgetCache.containsKey(tab.id)) {
+      _tabWidgetCache[tab.id] = _buildTabContent(tab, tabProvider);
+    }
+    return _tabWidgetCache[tab.id]!;
+  }
+
+  Widget _buildTabContent(TabSession tab, TabProvider tabProvider) {
+    switch (tab.type) {
+      case TabType.ssh:
+        return TerminalViewWidget(
+          key: ValueKey('terminal_${tab.id}'),
+          serverId: tab.serverId!,
+          tabId: tab.id,
+        );
+      case TabType.sftp:
+        return SFTPBrowser(
+          key: ValueKey('sftp_${tab.id}'),
+          serverId: tab.serverId!,
+          tabId: tab.id,
+        );
+      case TabType.local:
+        return LocalFileBrowser(
+          key: ValueKey('local_${tab.id}'),
+          onPathChanged: (path) {
+            tabProvider.updateTabPath(tab.id, path);
+          },
+        );
+    }
+  }
+
+  Widget _buildPaneContent(String? tabId, TabProvider tabProvider) {
     if (tabId == null) {
       return _buildEmptyPaneState();
     }
 
-    final tabProvider = context.read<TabProvider>();
     final tab = tabProvider.getTab(tabId);
 
     if (tab == null) {
       return _buildEmptyPaneState();
     }
 
-    switch (tab.type) {
-      case TabType.ssh:
-        return TerminalViewWidget(
-          key: ValueKey('terminal_$tabId'),
-          serverId: tab.serverId!,
-          tabId: tabId,
-        );
-      case TabType.sftp:
-        return SFTPBrowser(
-          key: ValueKey('sftp_$tabId'),
-          serverId: tab.serverId!,
-          tabId: tabId,
-        );
-      case TabType.local:
-        return LocalFileBrowser(
-          key: ValueKey('local_$tabId'),
-          onPathChanged: (path) {
-            tabProvider.updateTabPath(tabId, path);
-          },
-        );
-    }
+    return _getOrCreateTabWidget(tab, tabProvider);
   }
 
   Widget _buildEmptyPaneState() {

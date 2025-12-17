@@ -108,6 +108,19 @@ class TabProvider extends ChangeNotifier {
   void setActiveTab(String tabId) {
     if (_tabs.any((t) => t.id == tabId)) {
       _activeTabId = tabId;
+
+      // In split view, update the appropriate pane
+      if (_isSplitView) {
+        // If the tab is already in a pane, just update active
+        // If not, put it in the left pane by default
+        if (_leftPaneTabId != tabId && _rightPaneTabId != tabId) {
+          _leftPaneTabId = tabId;
+        }
+      } else {
+        // In single view, left pane always shows active tab
+        _leftPaneTabId = tabId;
+      }
+
       notifyListeners();
     }
   }
