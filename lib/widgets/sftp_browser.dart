@@ -6,8 +6,10 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import '../providers/connection_provider.dart';
 import '../providers/server_provider.dart';
+import '../models/server.dart';
 import '../providers/tab_provider.dart';
 import '../providers/transfer_provider.dart';
+import '../services/sftp_service.dart';
 import '../utils/theme.dart';
 
 class SFTPBrowser extends StatefulWidget {
@@ -30,35 +32,77 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
   bool _isLoading = true;
   String? _error;
   bool _isDragging = false;
+  bool _isFetching = false;
+  SFTPService? _sftpService;
 
   @override
   void initState() {
     super.initState();
-    _loadDirectory();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkConnectionAndLoad(provider: context.read<ConnectionProvider>());
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkConnectionAndLoad(provider: context.watch<ConnectionProvider>());
+  }
+
+  void _checkConnectionAndLoad({ConnectionProvider? provider}) {
+    final connectionProvider = provider ?? context.read<ConnectionProvider>();
+    final newService = connectionProvider.getSFTPConnection(widget.serverId);
+
+    // Update service reference if changed
+    if (newService != _sftpService) {
+      _sftpService = newService;
+    }
+
+    // Business Logic: If connected and we have no data, load it.
+    // We ignore _isLoading state here because if we are connected but have no items,
+    // we MUST attempt to load, even if the UI thinks it's already loading (stale state).
+    if (_sftpService != null && _sftpService!.isConnected) {
+      if (_items.isEmpty) {
+        _loadDirectory();
+      }
+    } else if (_error == 'Not connected' && _sftpService != null && _sftpService!.isConnected) {
+      // Recovery from error state
+      _loadDirectory();
+    }
   }
 
   Future<void> _loadDirectory([String? path]) async {
+    // Mutual Exclusion: Prevent concurrent loads
+    if (_isFetching) return;
+    
+    // Also respect manual refresh guard if we have items
+    if (_isLoading && _items.isNotEmpty) return;
+
+    _isFetching = true;
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
-    final connectionProvider = context.read<ConnectionProvider>();
-    final tabProvider = context.read<TabProvider>();
-    final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
-
-    if (sftpService == null || !sftpService.isConnected) {
-      setState(() {
-        _error = 'Not connected';
-        _isLoading = false;
-      });
-      return;
-    }
-
     try {
+      final connectionProvider = context.read<ConnectionProvider>();
+      final tabProvider = context.read<TabProvider>();
+      final sftpService = _sftpService ?? connectionProvider.getSFTPConnection(widget.serverId);
+
+      if (sftpService == null || !sftpService.isConnected) {
+        if (mounted) {
+           // Contract: If not connected, show specific error
+           setState(() {
+            _error = 'Not connected';
+          });
+        }
+        return;
+      }
+
       if (path != null) {
         _currentPath = path;
       } else {
+        // If no path provided, verify current or get default
         final dir = await sftpService.getCurrentDirectory();
         if (dir != null) {
           _currentPath = dir;
@@ -68,15 +112,26 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
       tabProvider.updateTabPath(widget.tabId, _currentPath);
 
       final items = await sftpService.listDirectory(_currentPath);
-      setState(() {
-        _items = items;
-        _isLoading = false;
-      });
+      
+      if (mounted) {
+        setState(() {
+          _items = items;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+        });
+      }
+    } finally {
+      _isFetching = false;
+      // Robustness: Always ensure loading state is cleared
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -99,47 +154,59 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     return '$_currentPath/$filename';
   }
 
-  Future<void> _downloadFile(String filename) async {
+  Future<void> _downloadFile(String filename, {String? localPath}) async {
     final connectionProvider = context.read<ConnectionProvider>();
     final transferProvider = context.read<TransferProvider>();
     final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
 
     if (sftpService == null) return;
 
-    final downloadDir = await getDownloadsDirectory();
-    if (downloadDir == null) return;
+    String? finalLocalPath = localPath;
+    if (finalLocalPath == null) {
+      final downloadDir = await getDownloadsDirectory();
+      if (downloadDir == null) return;
+      finalLocalPath = '${downloadDir.path}/$filename';
+    }
 
-    final localPath = '${downloadDir.path}/$filename';
     final remotePath = _getFullPath(filename);
+    bool isCancelled = false;
+    
+    final taskId = transferProvider.startTransfer(
+      filename, 
+      TransferType.download,
+      onCancel: () {
+        isCancelled = true;
+      },
+    );
 
-        bool isCancelled = false;
-        
-        final taskId = transferProvider.startTransfer(
-          filename, 
-          TransferType.download,
-          onCancel: () {
-            isCancelled = true;
-          },
-        );
-    
-        final success = await sftpService.downloadFile(
-          remotePath,
-          localPath,
-          onProgress: (received, total) {
-            transferProvider.updateProgress(taskId, received, total);
-          },
-          checkCancelled: () => isCancelled,
-        );
-    
-        if (success) {
-          transferProvider.completeTransfer(taskId);
-        } else {
-          if (isCancelled) {
-             // Already handled by transferProvider.cancelTransfer(taskId) which sets status to failed/cancelled
-          } else {
-             transferProvider.failTransfer(taskId, 'Download failed');
-          }
-        }  }
+    final success = await sftpService.downloadFile(
+      remotePath,
+      finalLocalPath,
+      onProgress: (received, total) {
+        transferProvider.updateProgress(taskId, received, total);
+      },
+      checkCancelled: () => isCancelled,
+    );
+
+    if (success) {
+      transferProvider.completeTransfer(taskId);
+    } else {
+      if (!isCancelled) {
+        transferProvider.failTransfer(taskId, 'Download failed');
+      }
+    }
+  }
+
+  Future<void> _downloadFileAs(String filename) async {
+    final String? outputFile = await FilePicker.platform.saveFile(
+      dialogTitle: 'Download $filename to...',
+      fileName: filename,
+    );
+
+    if (outputFile != null) {
+      await _downloadFile(filename, localPath: outputFile);
+    }
+  }
 
   Future<void> _uploadFile() async {
     final result = await FilePicker.platform.pickFiles(allowMultiple: true);
@@ -188,6 +255,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
                }
             }    }
 
+    if (!mounted) return;
     _loadDirectory();
   }
 
@@ -239,6 +307,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     if (sftpService == null) return;
 
     final success = await sftpService.createDirectory(_getFullPath(name));
+
+    if (!mounted) return;
 
     if (success) {
       _loadDirectory();
@@ -292,6 +362,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
       _getFullPath(newName),
     );
 
+    if (!mounted) return;
+
     if (success) {
       _loadDirectory();
     } else {
@@ -338,6 +410,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
       _getFullPath(filename),
       isDirectory: isDirectory,
     );
+
+    if (!mounted) return;
 
     if (success) {
       _loadDirectory();
@@ -387,7 +461,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     );
   }
 
-  Widget _buildConnectionOverlay(server) {
+  Widget _buildConnectionOverlay(Server? server) {
     return Container(
       color: AppTheme.backgroundColor.withValues(alpha: 0.9),
       child: Center(
@@ -579,10 +653,30 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     }
 
     if (_error != null) {
+      final server = context.read<ServerProvider>().getServer(widget.serverId);
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            if (server != null) ...[
+               Text(
+                server.name,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${server.host}:${server.port}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
             const Icon(Icons.error, size: 48, color: AppTheme.errorColor),
             const SizedBox(height: 16),
             Text(_error!, style: const TextStyle(color: AppTheme.errorColor)),
@@ -707,7 +801,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
               PopupMenuButton(
                 icon: const Icon(Icons.more_vert, size: 18),
                 itemBuilder: (context) => [
-                  if (!isDir)
+                  if (!isDir) ...[
                     const PopupMenuItem(
                       value: 'download',
                       child: Row(
@@ -718,6 +812,17 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
                         ],
                       ),
                     ),
+                    const PopupMenuItem(
+                      value: 'download_as',
+                      child: Row(
+                        children: [
+                          Icon(Icons.download_for_offline, size: 18),
+                          SizedBox(width: 8),
+                          Text('Download As...'),
+                        ],
+                      ),
+                    ),
+                  ],
                   const PopupMenuItem(
                     value: 'rename',
                     child: Row(
@@ -742,6 +847,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
                 onSelected: (value) {
                   if (value == 'download') {
                     _downloadFile(filename);
+                  } else if (value == 'download_as') {
+                    _downloadFileAs(filename);
                   } else if (value == 'rename') {
                     _renameItem(filename, isDir);
                   } else if (value == 'delete') {
@@ -780,7 +887,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
               ],
             ),
           ),
-        if (!isDir)
+        if (!isDir) ...[
           const PopupMenuItem<String>(
             value: 'download',
             child: Row(
@@ -791,6 +898,17 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
               ],
             ),
           ),
+          const PopupMenuItem<String>(
+            value: 'download_as',
+            child: Row(
+              children: [
+                Icon(Icons.download_for_offline, size: 18),
+                SizedBox(width: 8),
+                Text('Download As...'),
+              ],
+            ),
+          ),
+        ],
         const PopupMenuItem<String>(
           value: 'rename',
           child: Row(
@@ -818,6 +936,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
         _navigateTo(_getFullPath(filename));
       } else if (value == 'download') {
         _downloadFile(filename);
+      } else if (value == 'download_as') {
+        _downloadFileAs(filename);
       } else if (value == 'rename') {
         _renameItem(filename, isDir);
       } else if (value == 'delete') {

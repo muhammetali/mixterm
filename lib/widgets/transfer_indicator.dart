@@ -33,8 +33,13 @@ class _TransferIndicatorState extends State<TransferIndicator> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 width: 300,
-                height: _expanded ? 300 : 50,
+                height: _expanded ? 300 : 48,
+                constraints: BoxConstraints(
+                  maxHeight: _expanded ? 400 : 48,
+                  minHeight: 48,
+                ),
                 child: Column(
+                  mainAxisSize: _expanded ? MainAxisSize.max : MainAxisSize.min,
                   children: [
                     // Header
                     InkWell(
@@ -43,33 +48,39 @@ class _TransferIndicatorState extends State<TransferIndicator> {
                         top: const Radius.circular(8),
                         bottom: Radius.circular(_expanded ? 0 : 8),
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        child: Row(
-                          children: [
-                            if (activeCount > 0)
-                              SizedBox(
-                                width: 16, height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryColor),
-                              )
-                            else
-                              const Icon(Icons.check_circle, size: 16, color: AppTheme.successColor),
-                            const SizedBox(width: 8),
-                            Text(
-                              activeCount > 0 ? '$activeCount Active Transfers' : 'Transfers Completed',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                            ),
-                            const Spacer(),
-                             if (!_expanded && activeCount == 0)
-                               IconButton(
-                                 icon: const Icon(Icons.close, size: 16),
-                                 padding: EdgeInsets.zero,
-                                 constraints: const BoxConstraints(),
-                                 onPressed: provider.clearCompleted,
-                               )
-                             else
-                               Icon(_expanded ? Icons.expand_more : Icons.expand_less),
-                          ],
+                      child: SizedBox(
+                        height: 48, // Fixed height for header to prevent overflow
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          child: Row(
+                            children: [
+                              if (activeCount > 0)
+                                SizedBox(
+                                  width: 16, height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryColor),
+                                )
+                              else
+                                const Icon(Icons.check_circle, size: 16, color: AppTheme.successColor),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  activeCount > 0 ? '$activeCount Active Transfers' : 'Transfers Completed',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const Spacer(),
+                               if (!_expanded && activeCount == 0)
+                                 IconButton(
+                                   icon: const Icon(Icons.close, size: 16),
+                                   padding: EdgeInsets.zero,
+                                   constraints: const BoxConstraints(),
+                                   onPressed: provider.clearCompleted,
+                                 )
+                               else
+                                 Icon(_expanded ? Icons.expand_more : Icons.expand_less),
+                            ],
+                          ),
                         ),
                       ),
                     ),

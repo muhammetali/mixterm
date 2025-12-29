@@ -60,7 +60,7 @@ class SettingsScreen extends StatelessWidget {
                   _buildDropdownTile<String>(
                     'Terminal theme',
                     settings.terminalTheme,
-                    TerminalThemes.themes.map((t) => t.name).toList(),
+                    AppTerminalThemes.themes.map((t) => t.name).toList(),
                     (value) => settings.setTerminalTheme(value!),
                   ),
                   _buildSliderTile(

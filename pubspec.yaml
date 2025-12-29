@@ -19,8 +19,8 @@ dependencies:
   xterm: ^4.0.0
 
   # Google Auth & Drive
-  googleapis: ^13.2.0
-  googleapis_auth: ^1.6.0
+  googleapis: ^15.0.0
+  googleapis_auth: ^2.0.0
   http: ^1.2.0
 
   # Encryption
@@ -37,16 +37,17 @@ dependencies:
 
   # Utils
   uuid: ^4.5.1
-  intl: ^0.19.0
-  file_picker: ^8.1.6
+  intl: ^0.20.2
+  file_picker: ^10.3.8
   url_launcher: ^6.3.1
-  desktop_drop: ^0.4.4
+  desktop_drop: ^0.7.0
   cross_file: ^0.3.3+6
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
+  mocktail: ^1.0.4
 
 flutter:
   uses-material-design: true

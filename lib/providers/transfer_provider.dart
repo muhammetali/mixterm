@@ -25,6 +25,7 @@ class TransferTask {
     this.status = TransferStatus.pending,
     this.error,
     DateTime? startTime,
+    this.endTime,
   }) : startTime = startTime ?? DateTime.now();
 
   double get progress => totalBytes > 0 ? transferredBytes / totalBytes : 0.0;
@@ -55,11 +56,15 @@ class TransferProvider extends ChangeNotifier {
     // Map to hold cancellation callbacks for active tasks
     final Map<String, VoidCallback> _cancelCallbacks = {};
   
-    List<TransferTask> get tasks => List.unmodifiable(_tasks);
-  
-    // ... existing getters
-  
-    String startTransfer(String filename, TransferType type, {int totalBytes = 0, VoidCallback? onCancel}) {
+  List<TransferTask> get tasks => List.unmodifiable(_tasks);
+
+  List<TransferTask> get activeTasks => _tasks
+      .where((t) =>
+          t.status == TransferStatus.pending ||
+          t.status == TransferStatus.inProgress)
+      .toList();
+
+  String startTransfer(String filename, TransferType type, {int totalBytes = 0, VoidCallback? onCancel}) {
       final task = TransferTask(
         id: _uuid.v4(),
         filename: filename,

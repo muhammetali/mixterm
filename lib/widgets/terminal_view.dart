@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -5,9 +7,11 @@ import 'package:xterm/xterm.dart';
 import '../providers/connection_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/server_provider.dart';
+import '../models/server.dart';
 import '../providers/tab_provider.dart';
 import '../services/ssh_service.dart';
 import '../utils/theme.dart';
+import '../utils/terminal_themes.dart';
 
 enum ConnectionStatus {
   disconnected,
@@ -38,11 +42,29 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
   String _statusMessage = 'Initializing...';
   String? _errorMessage;
   bool _isInitialized = false;
+  
+  // Stream subscriptions to prevent memory leaks and race conditions
+  StreamSubscription<SSHConnectionState>? _connectionSubscription;
+  StreamSubscription<String>? _outputSubscription;
 
   @override
   void initState() {
     super.initState();
     _initTerminal();
+  }
+
+  @override
+  void dispose() {
+    _terminalController?.removeListener(_handleSelectionChange);
+    _cancelSubscriptions();
+    super.dispose();
+  }
+
+  void _cancelSubscriptions() {
+    _connectionSubscription?.cancel();
+    _connectionSubscription = null;
+    _outputSubscription?.cancel();
+    _outputSubscription = null;
   }
 
   void _initTerminal() {
@@ -52,8 +74,13 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
 
     // Initial connection check
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkConnectionState();
+      if (mounted) {
+        _checkConnectionState(provider: context.read<ConnectionProvider>());
+      }
     });
+
+    // Handle auto-copy on selection change robustly
+    _terminalController?.addListener(_handleSelectionChange);
 
     // Terminal callbacks
     _terminal!.onOutput = (data) {
@@ -65,19 +92,35 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
     };
   }
 
+  void _handleSelectionChange() {
+    if (!mounted) return;
+    final settings = context.read<SettingsProvider>();
+    
+    // Auto-copy on select if enabled
+    if (settings.copyOnSelect) {
+      final selection = _terminalController?.selection;
+      // Fixed: In xterm 4.0.0, BufferRange has begin and end
+      if (selection != null && selection.begin != selection.end) {
+        // Selection is updated, copy it silently
+        _copySelection(silent: true);
+      }
+    }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     // React to provider changes without manual polling
-    _checkConnectionState();
+    _checkConnectionState(provider: context.watch<ConnectionProvider>());
   }
 
-  void _checkConnectionState() {
-    final connectionProvider = context.watch<ConnectionProvider>();
+  void _checkConnectionState({ConnectionProvider? provider}) {
+    final connectionProvider = provider ?? context.read<ConnectionProvider>();
     final newService = connectionProvider.getSSHConnection(widget.serverId);
 
     // If service changed or we are not initialized yet
     if (newService != _sshService) {
+      _cancelSubscriptions(); // Ensure old listeners are cleared
       _sshService = newService;
       _isInitialized = false;
       
@@ -87,10 +130,22 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
       } else {
         // Lost connection reference (maybe disconnected from provider)
          if (mounted) {
-          setState(() {
-            _connectionStatus = ConnectionStatus.disconnected;
-            _statusMessage = 'Disconnected';
-          });
+          // Defer setState if called during build
+          if (SchedulerBinding.instance.schedulerPhase != SchedulerPhase.persistentCallbacks) {
+             setState(() {
+              _connectionStatus = ConnectionStatus.disconnected;
+              _statusMessage = 'Disconnected';
+            });
+          } else {
+             WidgetsBinding.instance.addPostFrameCallback((_) {
+               if (mounted) {
+                  setState(() {
+                    _connectionStatus = ConnectionStatus.disconnected;
+                    _statusMessage = 'Disconnected';
+                  });
+               }
+             });
+          }
         }
       }
     }
@@ -100,7 +155,7 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
     if (_sshService == null) return;
 
     // Listen to state changes from service
-    _sshService!.stateStream.listen((state) {
+    _connectionSubscription = _sshService!.stateStream.listen((state) {
       if (!mounted) return;
       
       setState(() {
@@ -112,12 +167,18 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
           case SSHConnectionState.connected:
             _connectionStatus = ConnectionStatus.connected;
             _statusMessage = 'Connected';
-            context.read<TabProvider>().updateTabConnection(widget.tabId, true);
+            // Defer provider update to avoid 'markNeedsBuild during build'
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) context.read<TabProvider>().updateTabConnection(widget.tabId, true);
+            });
             break;
           case SSHConnectionState.disconnected:
             _connectionStatus = ConnectionStatus.disconnected;
             _statusMessage = 'Disconnected';
-            context.read<TabProvider>().updateTabConnection(widget.tabId, false);
+            // Defer provider update
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) context.read<TabProvider>().updateTabConnection(widget.tabId, false);
+            });
             break;
           case SSHConnectionState.error:
             _connectionStatus = ConnectionStatus.error;
@@ -129,7 +190,7 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
 
     // Setup output stream if not already listening
     if (!_isInitialized) {
-       _sshService!.outputStream.listen((data) {
+       _outputSubscription = _sshService!.outputStream.listen((data) {
         _terminal?.write(data);
       });
       _isInitialized = true;
@@ -143,7 +204,9 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
             _statusMessage = 'Connected';
           });
        }
-       context.read<TabProvider>().updateTabConnection(widget.tabId, true);
+       WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) context.read<TabProvider>().updateTabConnection(widget.tabId, true);
+       });
     }
   }
 
@@ -165,35 +228,21 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
             children: [
               Container(
                 color: AppTheme.terminalBackground.withValues(alpha: settings.terminalOpacity),
-                child: Listener(
-                  onPointerDown: (event) {
-                    // Right click to paste
-                    if (event.buttons == 2 && settings.pasteOnRightClick) {
+                child: TerminalView(
+                  _terminal!,
+                  controller: _terminalController,
+                  theme: _buildTerminalTheme(context),
+                  autofocus: true,
+                  alwaysShowCursor: true,
+                  textStyle: TerminalStyle(
+                    fontSize: settings.fontSize.toDouble(),
+                    fontFamily: settings.fontFamily,
+                  ),
+                  onSecondaryTapDown: (details, offset) {
+                     if (settings.pasteOnRightClick) {
                       _pasteFromClipboard();
                     }
                   },
-                  child: TerminalView(
-                    _terminal!,
-                    controller: _terminalController,
-                    theme: _buildTerminalTheme(context),
-                    autofocus: true,
-                    alwaysShowCursor: true,
-                    textStyle: TerminalStyle(
-                      fontSize: settings.fontSize.toDouble(),
-                      fontFamily: settings.fontFamily,
-                    ),
-                    onSecondaryTapDown: (details, offset) {
-                       if (settings.pasteOnRightClick) {
-                        _pasteFromClipboard();
-                      }
-                    },
-                    // Handle selection change for auto-copy
-                    onSelectionChanged: (range, text) {
-                      if (settings.copyOnSelect && text != null && text.isNotEmpty) {
-                        Clipboard.setData(ClipboardData(text: text));
-                      }
-                    },
-                  ),
                 ),
               ),
               // Connection overlay
@@ -206,15 +255,9 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
     );
   }
 
-import '../utils/terminal_themes.dart';
-
-// ... (existing imports)
-
-  // ... (inside class)
-
   TerminalTheme _buildTerminalTheme(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    return TerminalThemes.getTheme(settings.terminalTheme);
+    return AppTerminalThemes.getTheme(settings.terminalTheme);
   }
 
   Widget _buildToolbar(String title) {
@@ -235,7 +278,7 @@ import '../utils/terminal_themes.dart';
             child: Text(
               title,
               style: const TextStyle(fontWeight: FontWeight.w500, color: AppTheme.textColor),
-              overflow: TextOverflow.ellipsis, // Fix RenderFlex overflow
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           if (!isConnected)
@@ -249,7 +292,7 @@ import '../utils/terminal_themes.dart';
           IconButton(
             icon: const Icon(Icons.copy, size: 18),
             tooltip: 'Copy Selection',
-            onPressed: _copySelection,
+            onPressed: () => _copySelection(),
           ),
           IconButton(
             icon: const Icon(Icons.content_paste, size: 18),
@@ -283,7 +326,7 @@ import '../utils/terminal_themes.dart';
      );
   }
 
-  Widget _buildConnectionOverlay(server) {
+  Widget _buildConnectionOverlay(Server? server) {
     return Container(
       color: AppTheme.backgroundColor.withValues(alpha: 0.9),
       child: Center(
@@ -364,6 +407,39 @@ import '../utils/terminal_themes.dart';
       ),
     );
   }
+  
+  Widget _buildConnectionProgress() {
+    return const SizedBox(
+      width: 48,
+      height: 48,
+      child: CircularProgressIndicator(
+        strokeWidth: 3,
+        valueColor: AlwaysStoppedAnimation(AppTheme.primaryColor),
+      ),
+    );
+  }
+
+  Widget _buildProgressSteps() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildStepDot(_connectionStatus == ConnectionStatus.connecting || _connectionStatus == ConnectionStatus.connected),
+        const SizedBox(width: 8),
+        _buildStepDot(_connectionStatus == ConnectionStatus.connected),
+      ],
+    );
+  }
+
+  Widget _buildStepDot(bool active) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: active ? AppTheme.primaryColor : AppTheme.borderColor,
+      ),
+    );
+  }
 
   Future<void> _reconnect() async {
     setState(() {
@@ -385,21 +461,18 @@ import '../utils/terminal_themes.dart';
     }
   }
 
-  void _copySelection() {
+  void _copySelection({bool silent = false}) {
     final selection = _terminalController?.selection;
-    if (selection != null) {
+    if (selection != null && selection.begin != selection.end) {
       final text = _terminal?.buffer.getText(selection);
       if (text != null && text.isNotEmpty) {
         Clipboard.setData(ClipboardData(text: text));
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Copied to clipboard'), duration: Duration(milliseconds: 500)),
-        );
       }
     }
   }
 
   Future<void> _pasteFromClipboard() async {
-    final data = await Clipboard.getData(ClipboardData.kTextPlain);
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
     if (data?.text != null) {
       _sshService?.write(data!.text!);
     }

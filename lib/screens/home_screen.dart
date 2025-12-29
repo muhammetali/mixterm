@@ -205,15 +205,17 @@ class _HomeScreenState extends State<HomeScreen> {
             size: 24,
           ),
           const SizedBox(width: 8),
-          const Text(
-            'MixTerm',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.textColor,
+          const Expanded(
+            child: Text(
+              'MixTerm',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textColor,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const Spacer(),
           Consumer<AuthService>(
             builder: (context, auth, _) {
               return IconButton(

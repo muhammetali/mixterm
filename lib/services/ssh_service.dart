@@ -27,6 +27,7 @@ class SSHConnectResult {
 class SSHService {
   SSHClient? _client;
   SSHSession? _session;
+  Timer? _keepAliveTimer;
   final StreamController<String> _outputController =
       StreamController<String>.broadcast();
   final StreamController<SSHConnectionState> _stateController =
@@ -98,9 +99,6 @@ class SSHService {
         pty: SSHPtyConfig(
           width: 80,
           height: 24,
-          modes: {
-            SSHRequestTerminalMode.ECHO: 1,
-          },
         ),
       );
       debugPrint('SSH: Shell session started');
@@ -114,6 +112,7 @@ class SSHService {
       });
 
       _stateController.add(SSHConnectionState.connected);
+      _startKeepAlive();
       return SSHConnectResult.ok();
     } on SocketException catch (e) {
       debugPrint('SSH: Socket error: $e');
@@ -146,10 +145,22 @@ class SSHService {
   }
 
   void resize(int width, int height) {
+    debugPrint('SSH: Resizing terminal to ${width}x$height');
     _session?.resizeTerminal(width, height);
   }
 
+  void _startKeepAlive() {
+    _keepAliveTimer?.cancel();
+    _keepAliveTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (isConnected) {
+        // TODO: Find correct method for keep-alive in dartssh2
+        // _client?.sendGlobalRequest('keepalive@openssh.com');
+      }
+    });
+  }
+
   Future<void> disconnect() async {
+    _keepAliveTimer?.cancel();
     _session?.close();
     _client?.close();
     _session = null;

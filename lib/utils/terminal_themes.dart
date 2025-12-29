@@ -8,7 +8,7 @@ class NamedTerminalTheme {
   const NamedTerminalTheme(this.name, this.theme);
 }
 
-class TerminalThemes {
+class AppTerminalThemes {
   static final List<NamedTerminalTheme> themes = [
     NamedTerminalTheme('Default Dark', _defaultDark),
     NamedTerminalTheme('Dracula', _dracula),
@@ -28,7 +28,7 @@ class TerminalThemes {
 
   static final _defaultDark = TerminalTheme(
     cursor: const Color(0xFF00D4AA),
-    selection: const Color.fromRGBO(38, 79, 120, 0.5),
+    selection: const Color.fromRGBO(38, 79, 120, 0.3),
     foreground: const Color(0xFFE6EDF3),
     background: Colors.transparent,
     black: const Color(0xFF000000),
@@ -47,11 +47,14 @@ class TerminalThemes {
     brightMagenta: const Color(0xFFD670D6),
     brightCyan: const Color(0xFF29B8DB),
     brightWhite: const Color(0xFFFFFFFF),
+    searchHitBackground: const Color.fromRGBO(255, 255, 0, 0.5),
+    searchHitBackgroundCurrent: const Color.fromRGBO(0, 255, 0, 0.5),
+    searchHitForeground: const Color(0xFF000000),
   );
 
   static final _dracula = TerminalTheme(
     cursor: const Color(0xFFF8F8F2),
-    selection: const Color(0xFF44475A),
+    selection: const Color(0x4D44475A),
     foreground: const Color(0xFFF8F8F2),
     background: Colors.transparent, // Let container handle it
     black: const Color(0xFF21222C),
@@ -70,11 +73,14 @@ class TerminalThemes {
     brightMagenta: const Color(0xFFFF92DF),
     brightCyan: const Color(0xFFA4FFFF),
     brightWhite: const Color(0xFFFFFFFF),
+    searchHitBackground: const Color.fromRGBO(255, 255, 0, 0.5),
+    searchHitBackgroundCurrent: const Color.fromRGBO(0, 255, 0, 0.5),
+    searchHitForeground: const Color(0xFF000000),
   );
 
   static final _solarizedDark = TerminalTheme(
     cursor: const Color(0xFF839496),
-    selection: const Color(0xFF073642),
+    selection: const Color(0x4D073642),
     foreground: const Color(0xFF839496),
     background: Colors.transparent,
     black: const Color(0xFF073642),
@@ -93,11 +99,14 @@ class TerminalThemes {
     brightMagenta: const Color(0xFF6C71C4),
     brightCyan: const Color(0xFF93A1A1),
     brightWhite: const Color(0xFFFDF6E3),
+    searchHitBackground: const Color.fromRGBO(255, 255, 0, 0.5),
+    searchHitBackgroundCurrent: const Color.fromRGBO(0, 255, 0, 0.5),
+    searchHitForeground: const Color(0xFF000000),
   );
   
   static final _monokai = TerminalTheme(
     cursor: const Color(0xFFF8F8F2),
-    selection: const Color(0xFF49483E),
+    selection: const Color(0x4D49483E),
     foreground: const Color(0xFFF8F8F2),
     background: Colors.transparent,
     black: const Color(0xFF272822),
@@ -116,11 +125,14 @@ class TerminalThemes {
     brightMagenta: const Color(0xFFAE81FF),
     brightCyan: const Color(0xFFA1EFE4),
     brightWhite: const Color(0xFFF9F8F5),
+    searchHitBackground: const Color.fromRGBO(255, 255, 0, 0.5),
+    searchHitBackgroundCurrent: const Color.fromRGBO(0, 255, 0, 0.5),
+    searchHitForeground: const Color(0xFF000000),
   );
 
   static final _githubLight = TerminalTheme(
     cursor: const Color(0xFF044289),
-    selection: const Color(0xFFCCEAE7),
+    selection: const Color(0x4DCCEAE7),
     foreground: const Color(0xFF24292E),
     background: Colors.transparent, // Typically white in container
     black: const Color(0xFF24292E),
@@ -139,5 +151,8 @@ class TerminalThemes {
     brightMagenta: const Color(0xFF5A32A3),
     brightCyan: const Color(0xFF3192AA),
     brightWhite: const Color(0xFFD1D5DA),
+    searchHitBackground: const Color.fromRGBO(255, 255, 0, 0.5),
+    searchHitBackgroundCurrent: const Color.fromRGBO(0, 255, 0, 0.5),
+    searchHitForeground: const Color(0xFF000000),
   );
 }
