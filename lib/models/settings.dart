@@ -9,6 +9,7 @@ class AppSettings {
   final double terminalOpacity;
   final bool showScrollbar;
   final int scrollbackLines;
+  final String terminalTheme;
 
   const AppSettings({
     this.copyOnSelect = true,
@@ -19,6 +20,7 @@ class AppSettings {
     this.terminalOpacity = 1.0,
     this.showScrollbar = true,
     this.scrollbackLines = 10000,
+    this.terminalTheme = 'Default Dark',
   });
 
   AppSettings copyWith({
@@ -30,6 +32,7 @@ class AppSettings {
     double? terminalOpacity,
     bool? showScrollbar,
     int? scrollbackLines,
+    String? terminalTheme,
   }) {
     return AppSettings(
       copyOnSelect: copyOnSelect ?? this.copyOnSelect,
@@ -40,6 +43,7 @@ class AppSettings {
       terminalOpacity: terminalOpacity ?? this.terminalOpacity,
       showScrollbar: showScrollbar ?? this.showScrollbar,
       scrollbackLines: scrollbackLines ?? this.scrollbackLines,
+      terminalTheme: terminalTheme ?? this.terminalTheme,
     );
   }
 
@@ -53,6 +57,7 @@ class AppSettings {
       'terminalOpacity': terminalOpacity,
       'showScrollbar': showScrollbar,
       'scrollbackLines': scrollbackLines,
+      'terminalTheme': terminalTheme,
     };
   }
 
@@ -66,6 +71,7 @@ class AppSettings {
       terminalOpacity: (json['terminalOpacity'] as num?)?.toDouble() ?? 1.0,
       showScrollbar: json['showScrollbar'] as bool? ?? true,
       scrollbackLines: json['scrollbackLines'] as int? ?? 10000,
+      terminalTheme: json['terminalTheme'] as String? ?? 'Default Dark',
     );
   }
 }

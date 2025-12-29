@@ -64,8 +64,7 @@ class SSHService {
           return SSHConnectResult.fail('Private key is empty');
         }
 
-        debugPrint('SSH: Private key length: ${privateKey.length}');
-        debugPrint('SSH: Key starts with: ${privateKey.substring(0, privateKey.length > 50 ? 50 : privateKey.length)}');
+        debugPrint('SSH: Using private key authentication');
 
         try {
           final keyPairs = SSHKeyPair.fromPem(
@@ -99,6 +98,9 @@ class SSHService {
         pty: SSHPtyConfig(
           width: 80,
           height: 24,
+          modes: {
+            SSHRequestTerminalMode.ECHO: 1,
+          },
         ),
       );
       debugPrint('SSH: Shell session started');

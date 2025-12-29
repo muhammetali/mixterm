@@ -20,6 +20,7 @@ class ConnectionResult<T> {
 class ConnectionProvider extends ChangeNotifier {
   final Map<String, SSHService> _sshConnections = {};
   final Map<String, SFTPService> _sftpConnections = {};
+  final Set<String> _connectingServers = {};
   String? _activeServerId;
   String? _activeConnectionType;
 
@@ -36,6 +37,11 @@ class ConnectionProvider extends ChangeNotifier {
       _sftpConnections[serverId]?.isConnected ?? false;
 
   Future<ConnectionResult<SSHService>> connectSSH(Server server) async {
+    // Race condition prevention
+    if (_connectingServers.contains(server.id)) {
+      return ConnectionResult.fail('Connection already in progress');
+    }
+
     if (_sshConnections.containsKey(server.id)) {
       final existing = _sshConnections[server.id]!;
       if (existing.isConnected) {
@@ -46,18 +52,26 @@ class ConnectionProvider extends ChangeNotifier {
       }
     }
 
-    final sshService = SSHService();
-    final result = await sshService.connect(server);
+    _connectingServers.add(server.id);
+    notifyListeners();
 
-    if (result.success) {
-      _sshConnections[server.id] = sshService;
-      _activeServerId = server.id;
-      _activeConnectionType = 'ssh';
+    try {
+      final sshService = SSHService();
+      final result = await sshService.connect(server);
+
+      if (result.success) {
+        _sshConnections[server.id] = sshService;
+        _activeServerId = server.id;
+        _activeConnectionType = 'ssh';
+        notifyListeners();
+        return ConnectionResult.ok(sshService);
+      }
+
+      return ConnectionResult.fail(result.error ?? 'Connection failed');
+    } finally {
+      _connectingServers.remove(server.id);
       notifyListeners();
-      return ConnectionResult.ok(sshService);
     }
-
-    return ConnectionResult.fail(result.error ?? 'Connection failed');
   }
 
   Future<ConnectionResult<SFTPService>> connectSFTP(Server server) async {

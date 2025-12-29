@@ -7,6 +7,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import '../providers/connection_provider.dart';
 import '../providers/server_provider.dart';
 import '../providers/tab_provider.dart';
+import '../providers/transfer_provider.dart';
 import '../utils/theme.dart';
 
 class SFTPBrowser extends StatefulWidget {
@@ -100,8 +101,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
 
   Future<void> _downloadFile(String filename) async {
     final connectionProvider = context.read<ConnectionProvider>();
+    final transferProvider = context.read<TransferProvider>();
     final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     if (sftpService == null) return;
 
@@ -111,22 +112,34 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     final localPath = '${downloadDir.path}/$filename';
     final remotePath = _getFullPath(filename);
 
-    scaffoldMessenger.showSnackBar(
-      SnackBar(content: Text('Downloading $filename...')),
-    );
-
-    final success = await sftpService.downloadFile(remotePath, localPath);
-
-    scaffoldMessenger.hideCurrentSnackBar();
-    scaffoldMessenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          success ? 'Downloaded to $localPath' : 'Download failed',
-        ),
-        backgroundColor: success ? AppTheme.successColor : AppTheme.errorColor,
-      ),
-    );
-  }
+        bool isCancelled = false;
+        
+        final taskId = transferProvider.startTransfer(
+          filename, 
+          TransferType.download,
+          onCancel: () {
+            isCancelled = true;
+          },
+        );
+    
+        final success = await sftpService.downloadFile(
+          remotePath,
+          localPath,
+          onProgress: (received, total) {
+            transferProvider.updateProgress(taskId, received, total);
+          },
+          checkCancelled: () => isCancelled,
+        );
+    
+        if (success) {
+          transferProvider.completeTransfer(taskId);
+        } else {
+          if (isCancelled) {
+             // Already handled by transferProvider.cancelTransfer(taskId) which sets status to failed/cancelled
+          } else {
+             transferProvider.failTransfer(taskId, 'Download failed');
+          }
+        }  }
 
   Future<void> _uploadFile() async {
     final result = await FilePicker.platform.pickFiles(allowMultiple: true);
@@ -137,41 +150,43 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
 
   Future<void> _uploadFiles(List<String> filePaths) async {
     final connectionProvider = context.read<ConnectionProvider>();
+    final transferProvider = context.read<TransferProvider>();
     final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     if (sftpService == null) return;
-
-    int successCount = 0;
-    int failCount = 0;
 
     for (final filePath in filePaths) {
       final fileName = filePath.split('/').last;
       final remotePath = _getFullPath(fileName);
 
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text('Uploading $fileName...')),
-      );
-
-      final success = await sftpService.uploadFile(filePath, remotePath);
-      if (success) {
-        successCount++;
-      } else {
-        failCount++;
-      }
-    }
-
-    scaffoldMessenger.hideCurrentSnackBar();
-    scaffoldMessenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          failCount == 0
-              ? 'Uploaded $successCount file(s)'
-              : 'Uploaded $successCount, failed $failCount file(s)',
-        ),
-        backgroundColor: failCount == 0 ? AppTheme.successColor : AppTheme.warningColor,
-      ),
-    );
+            bool isCancelled = false;
+      
+            final taskId = transferProvider.startTransfer(
+              fileName, 
+              TransferType.upload,
+              onCancel: () {
+                isCancelled = true;
+              },
+            );
+      
+            final success = await sftpService.uploadFile(
+              filePath,
+              remotePath,
+              onProgress: (sent, total) {
+                transferProvider.updateProgress(taskId, sent, total);
+              },
+              checkCancelled: () => isCancelled,
+            );
+      
+            if (success) {
+              transferProvider.completeTransfer(taskId);
+            } else {
+               if (isCancelled) {
+                  // Handled by provider
+               } else {
+                  transferProvider.failTransfer(taskId, 'Upload failed');
+               }
+            }    }
 
     _loadDirectory();
   }
@@ -360,36 +375,83 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
             child: Stack(
               children: [
                 _buildContent(),
+                if (_isLoading && _items.isEmpty && _error == null)
+                  _buildConnectionOverlay(server),
                 if (_isDragging)
-                  Container(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.2),
-                    child: const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.cloud_upload,
-                            size: 64,
-                            color: AppTheme.primaryColor,
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'Drop files here to upload',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: AppTheme.primaryColor,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  _buildDragOverlay(),
               ],
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildConnectionOverlay(server) {
+    return Container(
+      color: AppTheme.backgroundColor.withValues(alpha: 0.9),
+      child: Center(
+        child: Card(
+          color: AppTheme.surfaceColor,
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (server != null) ...[
+                  Text(
+                    server.name,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${server.host}:${server.port}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                const CircularProgressIndicator(),
+                const SizedBox(height: 24),
+                const Text('Connecting to SFTP...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDragOverlay() {
+    return Container(
+      color: AppTheme.primaryColor.withValues(alpha: 0.2),
+      child: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.cloud_upload,
+              size: 64,
+              color: AppTheme.primaryColor,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Drop files here to upload',
+              style: TextStyle(
+                fontSize: 18,
+                color: AppTheme.primaryColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -16,7 +16,7 @@ class AppTheme {
   static const Color terminalBackground = Color(0xFF0D1117);
   static const Color terminalForeground = Color(0xFFE6EDF3);
   static const Color terminalCursor = Color(0xFF00D4AA);
-  static const Color terminalSelection = Color(0xFF264F78);
+  static const Color terminalSelection = Color.fromRGBO(38, 79, 120, 0.5);
 
   static ThemeData get darkTheme {
     return ThemeData(

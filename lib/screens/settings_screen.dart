@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/auth_service.dart';
+import '../utils/terminal_themes.dart';
 import '../utils/theme.dart';
 import '../utils/constants.dart';
 
@@ -50,6 +51,18 @@ class SettingsScreen extends StatelessWidget {
               _buildSection(
                 'Appearance',
                 [
+                  _buildDropdownTile<String>(
+                    'Font family',
+                    settings.fontFamily,
+                    AppConstants.fontFamilies,
+                    (value) => settings.setFontFamily(value!),
+                  ),
+                  _buildDropdownTile<String>(
+                    'Terminal theme',
+                    settings.terminalTheme,
+                    TerminalThemes.themes.map((t) => t.name).toList(),
+                    (value) => settings.setTerminalTheme(value!),
+                  ),
                   _buildSliderTile(
                     'Font size',
                     settings.fontSize,
@@ -208,6 +221,30 @@ class SettingsScreen extends StatelessWidget {
         divisions: divisions,
         onChanged: onChanged,
         activeColor: AppTheme.primaryColor,
+      ),
+    );
+  }
+
+  Widget _buildDropdownTile<T>(
+    String title,
+    T value,
+    List<T> items,
+    ValueChanged<T?> onChanged,
+  ) {
+    return ListTile(
+      title: Text(title),
+      trailing: DropdownButton<T>(
+        value: value,
+        items: items.map((item) {
+          return DropdownMenuItem<T>(
+            value: item,
+            child: Text(item.toString()),
+          );
+        }).toList(),
+        onChanged: onChanged,
+        underline: const SizedBox(),
+        dropdownColor: AppTheme.surfaceColor,
+        style: const TextStyle(color: AppTheme.primaryColor),
       ),
     );
   }

@@ -20,6 +20,7 @@ class SettingsProvider extends ChangeNotifier {
   double get terminalOpacity => _settings.terminalOpacity;
   bool get showScrollbar => _settings.showScrollbar;
   int get scrollbackLines => _settings.scrollbackLines;
+  String get terminalTheme => _settings.terminalTheme;
 
   Future<void> loadSettings() async {
     _settings = await _storageService.loadSettings();
@@ -62,5 +63,9 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> setScrollbackLines(int value) async {
     await updateSettings(_settings.copyWith(scrollbackLines: value));
+  }
+
+  Future<void> setTerminalTheme(String value) async {
+    await updateSettings(_settings.copyWith(terminalTheme: value));
   }
 }

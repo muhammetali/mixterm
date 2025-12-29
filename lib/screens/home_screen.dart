@@ -10,6 +10,7 @@ import '../widgets/terminal_view.dart';
 import '../widgets/sftp_browser.dart';
 import '../widgets/session_tab_bar.dart';
 import '../widgets/dialogs/add_server_dialog.dart';
+import '../widgets/transfer_indicator.dart';
 import '../utils/theme.dart';
 import 'settings_screen.dart';
 
@@ -101,38 +102,43 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
-      body: Row(
+      body: Stack(
         children: [
-          Container(
-            width: 280,
-            decoration: const BoxDecoration(
-              color: AppTheme.surfaceColor,
-              border: Border(
-                right: BorderSide(color: AppTheme.borderColor),
-              ),
-            ),
-            child: Column(
-              children: [
-                _buildHeader(),
-                const Divider(height: 1),
-                Expanded(
-                  child: ServerList(
-                    onAddServer: _showAddServerDialog,
+          Row(
+            children: [
+              Container(
+                width: 280,
+                decoration: const BoxDecoration(
+                  color: AppTheme.surfaceColor,
+                  border: Border(
+                    right: BorderSide(color: AppTheme.borderColor),
                   ),
                 ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Column(
-              children: [
-                const SessionTabBar(),
-                Expanded(
-                  child: _buildMainContent(),
+                child: Column(
+                  children: [
+                    _buildHeader(),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: ServerList(
+                        onAddServer: _showAddServerDialog,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              Expanded(
+                child: Column(
+                  children: [
+                    const SessionTabBar(),
+                    Expanded(
+                      child: _buildMainContent(),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
+          const TransferIndicator(),
         ],
       ),
     );
