@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/server.dart';
 import '../models/settings.dart';
@@ -6,17 +7,20 @@ import 'crypto_service.dart';
 
 class StorageService {
   static const String _serversKey = 'servers';
+  static const String _backupServersKey = 'servers_backup';
   static const String _settingsKey = 'settings';
   static const String _masterPasswordHashKey = 'master_password_hash';
   static const String _saltKey = 'encryption_salt';
   static const String _googleUserKey = 'google_user';
+  static const String _lastSyncKey = 'last_sync_timestamp';
 
-  late SharedPreferences _prefs;
+  final SharedPreferences _prefs;
   String? _masterPassword;
   String? _salt;
 
+  StorageService(this._prefs);
+
   Future<void> init() async {
-    _prefs = await SharedPreferences.getInstance();
     _salt = _prefs.getString(_saltKey);
     if (_salt == null) {
       _salt = CryptoService.generateSalt();
@@ -51,32 +55,66 @@ class StorageService {
     _masterPassword = null;
   }
 
-  Future<List<Server>> loadServers() async {
+  Future<List<Server>> loadServers({bool useBackup = false}) async {
     if (_masterPassword == null || _salt == null) return [];
 
-    final encryptedData = _prefs.getString(_serversKey);
-    if (encryptedData == null) return [];
+    final key = useBackup ? _backupServersKey : _serversKey;
+    final encryptedData = _prefs.getString(key);
+    if (encryptedData == null) {
+      if (!useBackup) return loadServers(useBackup: true);
+      return [];
+    }
 
     final decrypted =
         CryptoService.decrypt(encryptedData, _masterPassword!, _salt!);
-    if (decrypted == null) return [];
+    
+    if (decrypted == null) {
+      if (!useBackup) {
+        debugPrint('Decryption failed for primary storage, trying backup...');
+        return loadServers(useBackup: true);
+      }
+      return [];
+    }
 
     try {
       final List<dynamic> jsonList = json.decode(decrypted);
       return jsonList.map((e) => Server.fromJson(e)).toList();
     } catch (e) {
+      debugPrint('JSON decode failed for $key: $e');
+      if (!useBackup) return loadServers(useBackup: true);
       return [];
     }
   }
 
-  Future<bool> saveServers(List<Server> servers) async {
+  Future<bool> saveServers(List<Server> servers, {bool createBackup = true}) async {
     if (_masterPassword == null || _salt == null) return false;
 
-    final jsonString = json.encode(servers.map((e) => e.toJson()).toList());
-    final encrypted =
-        CryptoService.encrypt(jsonString, _masterPassword!, _salt!);
-    await _prefs.setString(_serversKey, encrypted);
-    return true;
+    try {
+      // Create backup of current state before overwriting
+      if (createBackup) {
+        final currentData = _prefs.getString(_serversKey);
+        if (currentData != null) {
+          await _prefs.setString(_backupServersKey, currentData);
+        }
+      }
+
+      final jsonString = json.encode(servers.map((e) => e.toJson()).toList());
+      final encrypted =
+          CryptoService.encrypt(jsonString, _masterPassword!, _salt!);
+      await _prefs.setString(_serversKey, encrypted);
+      return true;
+    } catch (e) {
+      debugPrint('Failed to save servers: $e');
+      return false;
+    }
+  }
+
+  Future<void> saveLastSyncTimestamp(int timestamp) async {
+    await _prefs.setInt(_lastSyncKey, timestamp);
+  }
+
+  int getLastSyncTimestamp() {
+    return _prefs.getInt(_lastSyncKey) ?? 0;
   }
 
   Future<AppSettings> loadSettings() async {

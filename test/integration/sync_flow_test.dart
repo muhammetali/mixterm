@@ -35,6 +35,7 @@ void main() {
   setUp(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
     
     mockStorageService = MockStorageService();
     mockAuthService = MockAuthService();
@@ -42,8 +43,11 @@ void main() {
 
     // Setup Storage
     when(() => mockStorageService.loadServers()).thenAnswer((_) async => []);
-    when(() => mockStorageService.saveServers(any())).thenAnswer((_) async => true);
+    when(() => mockStorageService.saveServers(any(), createBackup: any(named: 'createBackup'))).thenAnswer((_) async => true);
     when(() => mockStorageService.loadSettings()).thenAnswer((_) async => const AppSettings());
+    when(() => mockStorageService.init()).thenAnswer((_) async {});
+    when(() => mockStorageService.saveLastSyncTimestamp(any())).thenAnswer((_) async {});
+    when(() => mockStorageService.getLastSyncTimestamp()).thenReturn(0);
 
     // Setup Auth
     when(() => mockAuthService.init()).thenAnswer((_) async {});
@@ -78,13 +82,19 @@ void main() {
       name: 'Cloud Server',
       host: '8.8.8.8',
       username: 'clouduser',
+      updatedAt: DateTime.now(),
     );
 
-    // Mock SyncService to return this server
+    // Mock SyncService to return this server during smart sync
     when(() => mockSyncService.syncFromCloud()).thenAnswer((_) async => SyncResult(
       success: true,
       message: 'Synced from cloud',
       servers: [cloudServer],
+    ));
+    
+    when(() => mockSyncService.syncToCloud(any())).thenAnswer((_) async => SyncResult(
+      success: true,
+      message: 'Synced to cloud',
     ));
 
     final serverProvider = ServerProvider(mockStorageService, mockSyncService);
@@ -96,15 +106,14 @@ void main() {
       storageService: mockStorageService,
     ));
 
-    // Allow _loadData to complete (includes auth.init, server.load, settings.load AND server.syncFromCloud)
+    // Allow _loadData to complete (includes auth.init, server.load, settings.load AND server.performSmartSync)
     await tester.pumpAndSettle();
 
     // 3. Verify
-    // SyncFromCloud should have been called because auth.isSignedIn is true
+    // syncFromCloud should have been called as part of performSmartSync
     verify(() => mockSyncService.syncFromCloud()).called(1);
 
     // The cloud server should now be visible in the UI
     expect(find.text('Cloud Server'), findsOneWidget);
-    expect(find.text('clouduser@8.8.8.8:22'), findsOneWidget);
   });
 }

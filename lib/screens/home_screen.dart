@@ -40,9 +40,9 @@ class _HomeScreenState extends State<HomeScreen> {
     await serverProvider.loadServers();
     await settingsProvider.loadSettings();
 
-    // Automatic cloud sync if signed in
+    // Automatic robust smart sync if signed in
     if (authService.isSignedIn) {
-      await serverProvider.syncFromCloud();
+      await serverProvider.performSmartSync();
     }
 
     setState(() {
@@ -85,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
-    final result = await serverProvider.syncToCloud();
+    final result = await serverProvider.performSmartSync();
 
     scaffoldMessenger.showSnackBar(
       SnackBar(

@@ -198,6 +198,7 @@ class ServerTile extends StatelessWidget {
 
     final result = await connectionProvider.connectSSH(server);
 
+    if (!context.mounted) return;
     scaffoldMessenger.hideCurrentSnackBar();
 
     if (result.success) {
@@ -245,6 +246,7 @@ class ServerTile extends StatelessWidget {
 
     final result = await connectionProvider.connectSFTP(server);
 
+    if (!context.mounted) return;
     scaffoldMessenger.hideCurrentSnackBar();
 
     if (result.success) {

@@ -10,10 +10,13 @@ import 'providers/connection_provider.dart';
 import 'providers/tab_provider.dart';
 import 'providers/transfer_provider.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final storageService = StorageService();
+  final prefs = await SharedPreferences.getInstance();
+  final storageService = StorageService(prefs);
   await storageService.init();
 
   final authService = AuthService();

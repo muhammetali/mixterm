@@ -72,10 +72,13 @@ void main() {
     when(() => mockSSHService.resize(any(), any())).thenAnswer((_) async {});
 
     // Default Storage behaviors
-    when(() => mockStorageService.loadServers()).thenAnswer((_) async => []);
-    when(() => mockStorageService.saveServers(any())).thenAnswer((_) async => true);
+    when(() => mockStorageService.loadServers(useBackup: any(named: 'useBackup'))).thenAnswer((_) async => []);
+    when(() => mockStorageService.saveServers(any(), createBackup: any(named: 'createBackup'))).thenAnswer((_) async => true);
     when(() => mockStorageService.loadSettings()).thenAnswer((_) async => const AppSettings());
     when(() => mockStorageService.saveSettings(any())).thenAnswer((_) async => true);
+    when(() => mockStorageService.init()).thenAnswer((_) async {});
+    when(() => mockStorageService.saveLastSyncTimestamp(any())).thenAnswer((_) async {});
+    when(() => mockStorageService.getLastSyncTimestamp()).thenReturn(0);
 
     // Default Auth behaviors
     when(() => mockAuthService.init()).thenAnswer((_) async {});
