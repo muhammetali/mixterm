@@ -28,8 +28,11 @@ def create_rounded_rect_mask(size, padding, radius):
     return mask
 
 
-def create_mixterm_icon(size=1024):
-    """Create a clean MixTerm icon."""
+def create_mixterm_icon(size=1024, rounded=True):
+    """
+    Create a clean MixTerm icon.
+    rounded: If True, applies rounded corners (Linux). If False, full square (macOS).
+    """
 
     img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -49,25 +52,32 @@ def create_mixterm_icon(size=1024):
     green = (39, 201, 63)
 
     # === Background ===
-    mask = create_rounded_rect_mask((size, size), padding, radius)
-
     bg_layer = Image.new('RGBA', (size, size), (*bg_color, 255))
-    bg_masked = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    bg_masked.paste(bg_layer, mask=mask)
-    img = Image.alpha_composite(img, bg_masked)
+    
+    if rounded:
+        mask = create_rounded_rect_mask((size, size), padding, radius)
+        bg_masked = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+        bg_masked.paste(bg_layer, mask=mask)
+        img = Image.alpha_composite(img, bg_masked)
+        
+        # === Subtle border (Only for rounded icons) ===
+        border_layer = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+        border_draw = ImageDraw.Draw(border_layer)
 
-    # === Subtle border ===
-    border_layer = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    border_draw = ImageDraw.Draw(border_layer)
+        # Draw border using arc approximation
+        bx1, by1 = padding, padding
+        bx2, by2 = size - padding, size - padding
 
-    # Draw border using arc approximation
-    bx1, by1 = padding, padding
-    bx2, by2 = size - padding, size - padding
+        border_draw.rounded_rectangle([bx1, by1, bx2, by2], radius=radius,
+                                      outline=(*teal, 40), width=3)
+        img = Image.alpha_composite(img, border_layer)
+        draw = ImageDraw.Draw(img)
+    else:
+        # Full bleed for macOS
+        img.paste(bg_layer)
+        # Re-initialize draw object for subsequent operations
+        draw = ImageDraw.Draw(img)
 
-    border_draw.rounded_rectangle([bx1, by1, bx2, by2], radius=radius,
-                                  outline=(*teal, 40), width=3)
-    img = Image.alpha_composite(img, border_layer)
-    draw = ImageDraw.Draw(img)
 
     # === Inner terminal window ===
     term_pad = int(size * 0.12)
@@ -208,7 +218,7 @@ def create_mixterm_icon(size=1024):
     return img
 
 
-def save_all_sizes(icon, output_dir):
+def save_all_sizes(output_dir):
     """Save icon in all required sizes."""
     macos_sizes = [16, 32, 64, 128, 256, 512, 1024]
     linux_sizes = [16, 24, 32, 48, 64, 128, 256, 512]
@@ -218,19 +228,28 @@ def save_all_sizes(icon, output_dir):
     os.makedirs(macos_dir, exist_ok=True)
     os.makedirs(linux_dir, exist_ok=True)
 
+    # === Create macOS icons (Square / Full Bleed) ===
+    print("Generating macOS icons (Full Bleed)...")
+    icon_macos = create_mixterm_icon(1024, rounded=False)
+    
     print("\nmacOS icons:")
     for s in macos_sizes:
-        resized = icon.resize((s, s), Image.Resampling.LANCZOS)
+        resized = icon_macos.resize((s, s), Image.Resampling.LANCZOS)
         resized.save(os.path.join(macos_dir, f'app_icon_{s}.png'))
         print(f"  {s}x{s} px")
 
+    # === Create Linux icons (Rounded) ===
+    print("\nGenerating Linux icons (Rounded)...")
+    icon_linux = create_mixterm_icon(1024, rounded=True)
+
     print("\nLinux icons:")
     for s in linux_sizes:
-        resized = icon.resize((s, s), Image.Resampling.LANCZOS)
+        resized = icon_linux.resize((s, s), Image.Resampling.LANCZOS)
         resized.save(os.path.join(linux_dir, f'mixterm_{s}.png'))
         print(f"  {s}x{s} px")
 
-    icon.save(os.path.join(output_dir, 'icon_master.png'))
+    # Save Master Icon (Rounded)
+    icon_linux.save(os.path.join(output_dir, 'icon_master.png'))
     print("\nMaster icon (1024x1024) saved")
 
 
@@ -239,13 +258,11 @@ def main():
     print("   MixTerm Icon Generator")
     print("=" * 45)
 
-    icon = create_mixterm_icon(1024)
-
     script_dir = os.path.dirname(os.path.abspath(__file__))
     output_dir = os.path.join(script_dir, '..', 'assets', 'icons')
     os.makedirs(output_dir, exist_ok=True)
 
-    save_all_sizes(icon, output_dir)
+    save_all_sizes(output_dir)
 
     print("\n" + "=" * 45)
     print("   Done!")
