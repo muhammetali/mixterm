@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'auth_service.dart';
 import 'storage_service.dart';
@@ -125,31 +126,41 @@ class SyncService {
   }
 
   Future<String> _getOrCreateFolder(drive.DriveApi driveApi) async {
-    final query =
-        "name='$_folderName' and mimeType='application/vnd.google-apps.folder' and trashed=false";
-    final result = await driveApi.files.list(q: query);
+    try {
+      // We use 'appDataFolder' space which is private to the app and more reliable
+      final query = "name='$_folderName' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+      final result = await driveApi.files.list(q: query, spaces: 'appDataFolder');
 
-    if (result.files != null && result.files!.isNotEmpty) {
-      return result.files!.first.id!;
+      if (result.files != null && result.files!.isNotEmpty) {
+        return result.files!.first.id!;
+      }
+
+      final folder = drive.File()
+        ..name = _folderName
+        ..mimeType = 'application/vnd.google-apps.folder'
+        ..parents = ['appDataFolder'];
+
+      final created = await driveApi.files.create(folder);
+      return created.id!;
+    } catch (e) {
+      debugPrint('Error getting/creating folder: $e');
+      rethrow;
     }
-
-    final folder = drive.File()
-      ..name = _folderName
-      ..mimeType = 'application/vnd.google-apps.folder';
-
-    final created = await driveApi.files.create(folder);
-    return created.id!;
   }
 
   Future<String?> _findFile(drive.DriveApi driveApi, String folderId) async {
-    final query =
-        "name='$_fileName' and '$folderId' in parents and trashed=false";
-    final result = await driveApi.files.list(q: query);
+    try {
+      final query = "name='$_fileName' and '$folderId' in parents and trashed=false";
+      final result = await driveApi.files.list(q: query, spaces: 'appDataFolder');
 
-    if (result.files != null && result.files!.isNotEmpty) {
-      return result.files!.first.id;
+      if (result.files != null && result.files!.isNotEmpty) {
+        return result.files!.first.id;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error finding sync file: $e');
+      return null;
     }
-    return null;
   }
 
   Future<bool> hasCloudData() async {

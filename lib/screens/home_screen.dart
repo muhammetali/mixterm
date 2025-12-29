@@ -40,6 +40,11 @@ class _HomeScreenState extends State<HomeScreen> {
     await serverProvider.loadServers();
     await settingsProvider.loadSettings();
 
+    // Automatic cloud sync if signed in
+    if (authService.isSignedIn) {
+      await serverProvider.syncFromCloud();
+    }
+
     setState(() {
       _isLoading = false;
     });
