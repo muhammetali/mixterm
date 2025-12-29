@@ -21,6 +21,7 @@ linux/flutter/ephemeral/
 # Credentials - IMPORTANT
 *.json
 !pubspec.json
+!Contents.json
 client_secret_*.json
 
 # Generated
