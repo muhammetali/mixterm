@@ -219,7 +219,14 @@ def create_mixterm_icon(size=1024, rounded=True):
 
 
 def save_all_sizes(output_dir):
-    """Save icon in all required sizes."""
+    """Save icon in all required sizes and update native project files."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.join(script_dir, '..')
+    
+    # Native directories
+    macos_native_dir = os.path.join(project_root, 'macos', 'Runner', 'Assets.xcassets', 'AppIcon.appiconset')
+    linux_native_file = os.path.join(project_root, 'linux', 'runner', 'mixterm.png')
+
     macos_sizes = [16, 32, 64, 128, 256, 512, 1024]
     linux_sizes = [16, 24, 32, 48, 64, 128, 256, 512]
 
@@ -235,8 +242,14 @@ def save_all_sizes(output_dir):
     print("\nmacOS icons:")
     for s in macos_sizes:
         resized = icon_macos.resize((s, s), Image.Resampling.LANCZOS)
+        # Save to assets
         resized.save(os.path.join(macos_dir, f'app_icon_{s}.png'))
-        print(f"  {s}x{s} px")
+        # Save to native macOS project
+        if os.path.exists(macos_native_dir):
+            resized.save(os.path.join(macos_native_dir, f'app_icon_{s}.png'))
+            print(f"  {s}x{s} px -> Native & Assets")
+        else:
+            print(f"  {s}x{s} px -> Assets only (Native dir not found)")
 
     # === Create Linux icons (Rounded) ===
     print("\nGenerating Linux icons (Rounded)...")
@@ -247,6 +260,12 @@ def save_all_sizes(output_dir):
         resized = icon_linux.resize((s, s), Image.Resampling.LANCZOS)
         resized.save(os.path.join(linux_dir, f'mixterm_{s}.png'))
         print(f"  {s}x{s} px")
+        
+        # Update Linux native icon (using 512px version as standard)
+        if s == 512:
+             if os.path.exists(os.path.dirname(linux_native_file)):
+                resized.save(linux_native_file)
+                print(f"  -> Updated linux/runner/mixterm.png")
 
     # Save Master Icon (Rounded)
     icon_linux.save(os.path.join(output_dir, 'icon_master.png'))
