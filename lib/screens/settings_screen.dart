@@ -112,6 +112,8 @@ class SettingsScreen extends StatelessWidget {
                 'Cloud Sync',
                 [
                   _GoogleAccountTile(),
+                  const Divider(),
+                  _MigrationTile(),
                 ],
               ),
               const SizedBox(height: 24),
@@ -454,5 +456,116 @@ class _GoogleAccountTileState extends State<_GoogleAccountTile> {
     } else {
       return '${date.day}/${date.month}/${date.year}';
     }
+  }
+}
+
+class _MigrationTile extends StatefulWidget {
+  @override
+  State<_MigrationTile> createState() => _MigrationTileState();
+}
+
+class _MigrationTileState extends State<_MigrationTile> {
+  bool _isMigrating = false;
+
+  Future<void> _showMigrationDialog() async {
+    final passwordController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Migrate Cloud Data'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'If your cloud data was encrypted with an old master password, '
+              'enter it below to recover your servers.',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Old Master Password',
+                border: OutlineInputBorder(),
+                hintText: 'Enter your previous master password',
+              ),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Migrate'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || passwordController.text.isEmpty) {
+      passwordController.dispose();
+      return;
+    }
+
+    final oldPassword = passwordController.text;
+    passwordController.dispose();
+
+    setState(() => _isMigrating = true);
+
+    try {
+      final serverProvider = context.read<ServerProvider>();
+      final result = await serverProvider.migrateFromMasterPassword(oldPassword);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message),
+            backgroundColor: result.success ? AppTheme.successColor : AppTheme.errorColor,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isMigrating = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthService>(
+      builder: (context, auth, _) {
+        if (!auth.isSignedIn) {
+          return const SizedBox.shrink();
+        }
+
+        return ListTile(
+          leading: const Icon(Icons.restore, color: AppTheme.warningColor),
+          title: const Text('Recover Old Cloud Data'),
+          subtitle: const Text(
+            'Decrypt cloud data that was encrypted with master password',
+            style: TextStyle(fontSize: 12),
+          ),
+          trailing: _isMigrating
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onPressed: _showMigrationDialog,
+                ),
+          onTap: _isMigrating ? null : _showMigrationDialog,
+        );
+      },
+    );
   }
 }

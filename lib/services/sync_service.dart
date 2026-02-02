@@ -22,12 +22,20 @@ class SyncService {
     }
 
     try {
-      final encryptionKey = _storageService.encryptionKey;
       final salt = _storageService.salt;
+      final googleUserId = _authService.userId;
 
-      if (encryptionKey == null || salt == null) {
+      if (salt == null) {
         return SyncResult(success: false, message: 'Encryption not initialized');
       }
+
+      if (googleUserId == null) {
+        return SyncResult(success: false, message: 'Google User ID not available');
+      }
+
+      // Always use Google User ID + salt for cloud encryption
+      // This ensures the same key can be derived on any device with the same Google account
+      final cloudEncryptionKey = await CryptoService.deriveKeyFromGoogleIdAsync(googleUserId, salt);
 
       final jsonData = json.encode({
         'version': 2, // Bumped version for new encryption scheme
@@ -35,7 +43,7 @@ class SyncService {
         'updatedAt': DateTime.now().toIso8601String(),
       });
 
-      final encryptedData = CryptoService.encryptWithKey(jsonData, encryptionKey);
+      final encryptedData = CryptoService.encryptWithKey(jsonData, cloudEncryptionKey);
 
       final fileContent = json.encode({
         'salt': salt,
@@ -104,9 +112,27 @@ class SyncService {
       final cloudData = json.decode(content);
 
       final encryptedData = cloudData['data'] as String;
+      final cloudSalt = cloudData['salt'] as String?;
 
       debugPrint('Sync: Attempting to decrypt cloud data');
-      final decrypted = CryptoService.decryptWithKey(encryptedData, encryptionKey);
+
+      // Use cloud salt + Google User ID to derive the correct decryption key
+      // This ensures the same key is used across all devices
+      String? decrypted;
+      final googleUserId = _authService.userId;
+
+      if (cloudSalt != null && googleUserId != null) {
+        // Derive key using cloud salt (same key that was used to encrypt)
+        final cloudKey = await CryptoService.deriveKeyFromGoogleIdAsync(googleUserId, cloudSalt);
+        decrypted = CryptoService.decryptWithKey(encryptedData, cloudKey);
+        debugPrint('Sync: Attempted decryption with Google ID + cloud salt');
+      }
+
+      // Fallback to local encryption key if above fails
+      if (decrypted == null) {
+        decrypted = CryptoService.decryptWithKey(encryptedData, encryptionKey);
+        debugPrint('Sync: Fallback to local encryption key');
+      }
 
       if (decrypted == null) {
         debugPrint('Sync: Decryption failed - encryption key mismatch');
@@ -185,6 +211,129 @@ class SyncService {
       return false;
     }
   }
+
+  /// Migrates cloud data from old master password encryption to new Google ID encryption
+  /// Returns the decrypted servers if successful, null if decryption fails
+  Future<MigrationResult> migrateFromMasterPassword(String oldMasterPassword) async {
+    final driveApi = _authService.getDriveApi();
+    if (driveApi == null) {
+      return MigrationResult(success: false, message: 'Not signed in to Google');
+    }
+
+    final googleUserId = _authService.userId;
+    if (googleUserId == null) {
+      return MigrationResult(success: false, message: 'Google User ID not available');
+    }
+
+    try {
+      final folderId = await _getOrCreateFolder(driveApi);
+      final fileId = await _findFile(driveApi, folderId);
+
+      if (fileId == null) {
+        return MigrationResult(success: false, message: 'No cloud data found to migrate');
+      }
+
+      debugPrint('Migration: Downloading cloud data...');
+      final response = await driveApi.files.get(
+        fileId,
+        downloadOptions: drive.DownloadOptions.fullMedia,
+      ) as drive.Media;
+
+      final bytes = await response.stream.expand((e) => e).toList();
+      final content = utf8.decode(bytes);
+      final cloudData = json.decode(content);
+
+      final encryptedData = cloudData['data'] as String;
+      final cloudSalt = cloudData['salt'] as String;
+
+      debugPrint('Migration: Attempting decryption with master password...');
+
+      // Try to decrypt with old master password method
+      final decrypted = CryptoService.decrypt(encryptedData, oldMasterPassword, cloudSalt);
+
+      if (decrypted == null) {
+        return MigrationResult(success: false, message: 'Decryption failed - incorrect master password');
+      }
+
+      debugPrint('Migration: Decryption successful! Parsing servers...');
+
+      final jsonData = json.decode(decrypted);
+      final serversList = jsonData['servers'] as List;
+      final servers = serversList.map((s) => Server.fromJson(s)).toList();
+
+      debugPrint('Migration: Found ${servers.length} servers. Re-encrypting with new method...');
+
+      // Re-encrypt with new method (Google User ID + salt)
+      final localSalt = _storageService.salt!;
+      final newKey = await CryptoService.deriveKeyFromGoogleIdAsync(googleUserId, localSalt);
+
+      final newJsonData = json.encode({
+        'version': 2,
+        'servers': servers.map((s) => s.toJson()).toList(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+
+      final newEncryptedData = CryptoService.encryptWithKey(newJsonData, newKey);
+
+      final newFileContent = json.encode({
+        'salt': localSalt,
+        'data': newEncryptedData,
+        'checksum': CryptoService.hashData(newJsonData),
+      });
+
+      debugPrint('Migration: Uploading re-encrypted data to cloud...');
+
+      final media = drive.Media(
+        Stream.value(utf8.encode(newFileContent)),
+        utf8.encode(newFileContent).length,
+      );
+
+      await driveApi.files.update(
+        drive.File(),
+        fileId,
+        uploadMedia: media,
+      );
+
+      // Also save locally
+      await _storageService.saveServers(servers);
+
+      debugPrint('Migration: Complete! ${servers.length} servers migrated successfully.');
+
+      return MigrationResult(
+        success: true,
+        message: 'Migration successful! ${servers.length} servers recovered.',
+        servers: servers,
+      );
+    } catch (e) {
+      debugPrint('Migration: Error - $e');
+      return MigrationResult(success: false, message: 'Migration failed: $e');
+    }
+  }
+
+  /// Deletes cloud data - useful when encryption keys don't match
+  Future<SyncResult> deleteCloudData() async {
+    final driveApi = _authService.getDriveApi();
+    if (driveApi == null) {
+      return SyncResult(success: false, message: 'Not signed in to Google');
+    }
+
+    try {
+      final folderId = await _getOrCreateFolder(driveApi);
+      final fileId = await _findFile(driveApi, folderId);
+
+      if (fileId == null) {
+        return SyncResult(success: true, message: 'No cloud data to delete');
+      }
+
+      await driveApi.files.delete(fileId);
+      debugPrint('Sync: Cloud data deleted successfully');
+
+      return SyncResult(success: true, message: 'Cloud data deleted');
+    } catch (e) {
+      debugPrint('Sync: Error deleting cloud data: $e');
+      return SyncResult(success: false, message: 'Failed to delete cloud data: $e');
+    }
+  }
 }
 
 class SyncResult {
@@ -193,6 +342,18 @@ class SyncResult {
   final List<Server>? servers;
 
   SyncResult({
+    required this.success,
+    required this.message,
+    this.servers,
+  });
+}
+
+class MigrationResult {
+  final bool success;
+  final String message;
+  final List<Server>? servers;
+
+  MigrationResult({
     required this.success,
     required this.message,
     this.servers,
