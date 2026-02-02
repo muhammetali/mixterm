@@ -10,6 +10,8 @@ class AppSettings {
   final bool showScrollbar;
   final int scrollbackLines;
   final String terminalTheme;
+  final bool sidebarCollapsed;
+  final String terminalForegroundColor;
 
   const AppSettings({
     this.copyOnSelect = true,
@@ -21,6 +23,8 @@ class AppSettings {
     this.showScrollbar = true,
     this.scrollbackLines = 10000,
     this.terminalTheme = 'Default Dark',
+    this.sidebarCollapsed = false,
+    this.terminalForegroundColor = 'Default',
   });
 
   AppSettings copyWith({
@@ -33,6 +37,8 @@ class AppSettings {
     bool? showScrollbar,
     int? scrollbackLines,
     String? terminalTheme,
+    bool? sidebarCollapsed,
+    String? terminalForegroundColor,
   }) {
     return AppSettings(
       copyOnSelect: copyOnSelect ?? this.copyOnSelect,
@@ -44,6 +50,8 @@ class AppSettings {
       showScrollbar: showScrollbar ?? this.showScrollbar,
       scrollbackLines: scrollbackLines ?? this.scrollbackLines,
       terminalTheme: terminalTheme ?? this.terminalTheme,
+      sidebarCollapsed: sidebarCollapsed ?? this.sidebarCollapsed,
+      terminalForegroundColor: terminalForegroundColor ?? this.terminalForegroundColor,
     );
   }
 
@@ -58,6 +66,8 @@ class AppSettings {
       'showScrollbar': showScrollbar,
       'scrollbackLines': scrollbackLines,
       'terminalTheme': terminalTheme,
+      'sidebarCollapsed': sidebarCollapsed,
+      'terminalForegroundColor': terminalForegroundColor,
     };
   }
 
@@ -72,6 +82,8 @@ class AppSettings {
       showScrollbar: json['showScrollbar'] as bool? ?? true,
       scrollbackLines: json['scrollbackLines'] as int? ?? 10000,
       terminalTheme: json['terminalTheme'] as String? ?? 'Default Dark',
+      sidebarCollapsed: json['sidebarCollapsed'] as bool? ?? false,
+      terminalForegroundColor: json['terminalForegroundColor'] as String? ?? 'Default',
     );
   }
 }

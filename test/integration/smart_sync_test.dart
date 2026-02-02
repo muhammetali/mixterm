@@ -3,17 +3,22 @@ import 'package:mixterm/models/server.dart';
 import 'package:mixterm/providers/server_provider.dart';
 import 'package:mixterm/services/sync_service.dart';
 import 'package:mixterm/services/storage_service.dart';
+import 'package:mixterm/services/crypto_service.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockSyncService extends Mock implements SyncService {}
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late ServerProvider serverProvider;
   late MockSyncService mockSyncService;
   late StorageService storageService;
 
   setUp(() async {
+    // Set test device key to bypass path_provider file system access
+    CryptoService.setTestDeviceKey('test_device_key_for_smart_sync_tests');
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     storageService = StorageService(prefs);
@@ -25,6 +30,11 @@ void main() {
 
     // Register fallback for mocktail
     registerFallbackValue(<Server>[]);
+  });
+
+  tearDown(() {
+    // Reset test device key after each test
+    CryptoService.setTestDeviceKey(null);
   });
 
   group('Smart Sync Robustness Tests (Mocktail)', () {

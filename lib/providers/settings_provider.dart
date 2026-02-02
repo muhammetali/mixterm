@@ -21,6 +21,8 @@ class SettingsProvider extends ChangeNotifier {
   bool get showScrollbar => _settings.showScrollbar;
   int get scrollbackLines => _settings.scrollbackLines;
   String get terminalTheme => _settings.terminalTheme;
+  bool get sidebarCollapsed => _settings.sidebarCollapsed;
+  String get terminalForegroundColor => _settings.terminalForegroundColor;
 
   Future<void> loadSettings() async {
     _settings = await _storageService.loadSettings();
@@ -67,5 +69,17 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> setTerminalTheme(String value) async {
     await updateSettings(_settings.copyWith(terminalTheme: value));
+  }
+
+  Future<void> setSidebarCollapsed(bool value) async {
+    await updateSettings(_settings.copyWith(sidebarCollapsed: value));
+  }
+
+  void toggleSidebar() {
+    setSidebarCollapsed(!_settings.sidebarCollapsed);
+  }
+
+  Future<void> setTerminalForegroundColor(String value) async {
+    await updateSettings(_settings.copyWith(terminalForegroundColor: value));
   }
 }

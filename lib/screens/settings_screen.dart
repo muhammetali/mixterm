@@ -65,6 +65,12 @@ class SettingsScreen extends StatelessWidget {
                     AppTerminalThemes.themes.map((t) => t.name).toList(),
                     (value) => settings.setTerminalTheme(value!),
                   ),
+                  _buildDropdownTile<String>(
+                    'Text color',
+                    settings.terminalForegroundColor,
+                    AppTerminalThemes.foregroundColors.map((c) => c.name).toList(),
+                    (value) => settings.setTerminalForegroundColor(value!),
+                  ),
                   _buildSliderTile(
                     'Font size',
                     settings.fontSize,
@@ -91,6 +97,18 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               _buildSection(
+                'Interface',
+                [
+                  _buildSwitchTile(
+                    'Collapse sidebar',
+                    'Show sidebar in collapsed mode (icons only)',
+                    settings.sidebarCollapsed,
+                    (value) => settings.setSidebarCollapsed(value),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              _buildSection(
                 'Cloud Sync',
                 [
                   _GoogleAccountTile(),
@@ -106,7 +124,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const ListTile(
                     title: Text('MixTerm'),
-                    subtitle: Text('SSH/SFTP client for Linux and macOS'),
+                    subtitle: Text('Professional SSH/SFTP client for Linux, macOS and Windows'),
                   ),
                 ],
               ),

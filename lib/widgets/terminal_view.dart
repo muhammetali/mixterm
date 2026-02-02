@@ -212,13 +212,25 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsProvider>();
+    // Use select() to only rebuild when specific settings change
+    final fontSize = context.select<SettingsProvider, int>((s) => s.fontSize);
+    final fontFamily = context.select<SettingsProvider, String>((s) => s.fontFamily);
+    final terminalOpacity = context.select<SettingsProvider, double>((s) => s.terminalOpacity);
+    final pasteOnRightClick = context.select<SettingsProvider, bool>((s) => s.pasteOnRightClick);
+    final terminalTheme = context.select<SettingsProvider, String>((s) => s.terminalTheme);
+    final terminalForegroundColor = context.select<SettingsProvider, String>((s) => s.terminalForegroundColor);
+
     final serverProvider = context.read<ServerProvider>();
     final server = serverProvider.getServer(widget.serverId);
 
     if (_terminal == null) {
       return const Center(child: CircularProgressIndicator());
     }
+
+    final theme = AppTerminalThemes.getTheme(
+      terminalTheme,
+      foregroundColorName: terminalForegroundColor,
+    );
 
     return Column(
       children: [
@@ -230,19 +242,19 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
                 focusNode: FocusNode(),
                 onKeyEvent: _handleKeyEvent,
                 child: Container(
-                  color: AppTheme.terminalBackground.withValues(alpha: settings.terminalOpacity),
+                  color: AppTheme.terminalBackground.withValues(alpha: terminalOpacity),
                   child: TerminalView(
                     _terminal!,
                     controller: _terminalController,
-                    theme: _buildTerminalTheme(context),
+                    theme: theme,
                     autofocus: true,
                     alwaysShowCursor: true,
                     textStyle: TerminalStyle(
-                      fontSize: settings.fontSize.toDouble(),
-                      fontFamily: settings.fontFamily,
+                      fontSize: fontSize.toDouble(),
+                      fontFamily: fontFamily,
                     ),
                     onSecondaryTapDown: (details, offset) {
-                       if (settings.pasteOnRightClick) {
+                      if (pasteOnRightClick) {
                         _pasteFromClipboard();
                       }
                     },
@@ -259,10 +271,7 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
     );
   }
 
-  TerminalTheme _buildTerminalTheme(BuildContext context) {
-    final settings = context.watch<SettingsProvider>();
-    return AppTerminalThemes.getTheme(settings.terminalTheme);
-  }
+  // Theme is now built directly in build() method with select() for optimization
 
   Widget _buildToolbar(String title) {
     final isConnected = _connectionStatus == ConnectionStatus.connected;

@@ -4,6 +4,8 @@ import '../models/tab_session.dart';
 
 class TabProvider extends ChangeNotifier {
   final List<TabSession> _tabs = [];
+  // O(1) lookup index for tabs by ID
+  final Map<String, int> _tabIndex = {};
   String? _activeTabId;
 
   // Terminal instances stored by tab ID
@@ -12,11 +14,18 @@ class TabProvider extends ChangeNotifier {
 
   List<TabSession> get tabs => List.unmodifiable(_tabs);
   String? get activeTabId => _activeTabId;
-  TabSession? get activeTab =>
-      _tabs.where((t) => t.id == _activeTabId).firstOrNull;
 
+  /// O(1) lookup for active tab using index map
+  TabSession? get activeTab {
+    if (_activeTabId == null) return null;
+    final index = _tabIndex[_activeTabId];
+    return index != null ? _tabs[index] : null;
+  }
+
+  /// O(1) lookup for tab by ID using index map
   TabSession? getTab(String tabId) {
-    return _tabs.where((t) => t.id == tabId).firstOrNull;
+    final index = _tabIndex[tabId];
+    return index != null ? _tabs[index] : null;
   }
 
   Terminal getOrCreateTerminal(String tabId) {
@@ -47,16 +56,21 @@ class TabProvider extends ChangeNotifier {
       title: title,
     );
     _tabs.add(tab);
+    _tabIndex[tab.id] = _tabs.length - 1; // O(1) index update
     _activeTabId = tab.id;
     notifyListeners();
     return tab.id;
   }
 
   void removeTab(String tabId) {
-    final index = _tabs.indexWhere((t) => t.id == tabId);
-    if (index == -1) return;
+    final index = _tabIndex[tabId]; // O(1) lookup
+    if (index == null) return;
 
     _tabs.removeAt(index);
+    _tabIndex.remove(tabId);
+
+    // Rebuild index for tabs after the removed one
+    _rebuildIndexFrom(index);
 
     // Clean up terminal resources
     _terminals[tabId]?.buffer.clear();
@@ -78,31 +92,31 @@ class TabProvider extends ChangeNotifier {
   }
 
   void setActiveTab(String tabId) {
-    if (_tabs.any((t) => t.id == tabId)) {
+    if (_tabIndex.containsKey(tabId)) { // O(1) check
       _activeTabId = tabId;
       notifyListeners();
     }
   }
 
   void updateTabTitle(String tabId, String title) {
-    final index = _tabs.indexWhere((t) => t.id == tabId);
-    if (index != -1) {
+    final index = _tabIndex[tabId]; // O(1) lookup
+    if (index != null) {
       _tabs[index] = _tabs[index].copyWith(title: title);
       notifyListeners();
     }
   }
 
   void updateTabConnection(String tabId, bool isConnected) {
-    final index = _tabs.indexWhere((t) => t.id == tabId);
-    if (index != -1) {
+    final index = _tabIndex[tabId]; // O(1) lookup
+    if (index != null) {
       _tabs[index] = _tabs[index].copyWith(isConnected: isConnected);
       notifyListeners();
     }
   }
 
   void updateTabPath(String tabId, String path) {
-    final index = _tabs.indexWhere((t) => t.id == tabId);
-    if (index != -1) {
+    final index = _tabIndex[tabId]; // O(1) lookup
+    if (index != null) {
       _tabs[index] = _tabs[index].copyWith(currentPath: path);
       notifyListeners();
     }
@@ -114,7 +128,16 @@ class TabProvider extends ChangeNotifier {
     }
     final tab = _tabs.removeAt(oldIndex);
     _tabs.insert(newIndex, tab);
+    // Rebuild index for affected range
+    _rebuildIndexFrom(oldIndex < newIndex ? oldIndex : newIndex);
     notifyListeners();
+  }
+
+  /// Rebuild index map from a specific position
+  void _rebuildIndexFrom(int fromIndex) {
+    for (var i = fromIndex; i < _tabs.length; i++) {
+      _tabIndex[_tabs[i].id] = i;
+    }
   }
 
   @override
@@ -124,6 +147,7 @@ class TabProvider extends ChangeNotifier {
     }
     _terminalControllers.clear();
     _terminals.clear();
+    _tabIndex.clear();
     super.dispose();
   }
 }

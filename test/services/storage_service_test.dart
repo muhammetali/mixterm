@@ -7,11 +7,6 @@ import 'package:mixterm/models/settings.dart';
 import 'package:mixterm/services/storage_service.dart';
 import 'package:mixterm/services/crypto_service.dart';
 
-// Mock for testing without file system access
-class MockCryptoService extends Mock {
-  static Uint8List? mockDeviceKey;
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -20,9 +15,16 @@ void main() {
     late StorageService storageService;
 
     setUp(() async {
+      // Set test device key to bypass path_provider file system access
+      CryptoService.setTestDeviceKey('test_device_key_for_storage_tests');
       SharedPreferences.setMockInitialValues({});
       prefs = await SharedPreferences.getInstance();
       storageService = StorageService(prefs);
+    });
+
+    tearDown(() {
+      // Reset test device key after each test
+      CryptoService.setTestDeviceKey(null);
     });
 
     group('init', () {

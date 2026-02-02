@@ -8,6 +8,8 @@ class ServerProvider extends ChangeNotifier {
   final SyncService _syncService;
 
   List<Server> _servers = [];
+  // O(1) lookup index for servers by ID
+  Map<String, int> _serverIndex = {};
   bool _isLoading = false;
   bool _isSyncing = false;
   String? _error;
@@ -26,6 +28,7 @@ class ServerProvider extends ChangeNotifier {
 
     try {
       _servers = await _storageService.loadServers();
+      _rebuildIndex(); // Build index after loading
     } catch (e) {
       _error = e.toString();
     }
@@ -44,19 +47,19 @@ class ServerProvider extends ChangeNotifier {
 
     try {
       debugPrint('SmartSync: Starting synchronization process...');
-      
+
       // 1. Fetch cloud data
       final cloudResult = await _syncService.syncFromCloud();
-      
+
       if (!cloudResult.success && cloudResult.message != 'No cloud data found') {
         return cloudResult;
       }
 
       final cloudServers = cloudResult.servers ?? [];
-      
+
       // 2. Perform Intelligent Merge
       final mergedServers = _mergeServers(_servers, cloudServers);
-      
+
       // 3. Save locally (with automatic backup in StorageService)
       final localSaveSuccess = await _storageService.saveServers(mergedServers);
       if (!localSaveSuccess) {
@@ -64,18 +67,19 @@ class ServerProvider extends ChangeNotifier {
       }
 
       _servers = mergedServers;
-      
+      _rebuildIndex(); // Rebuild index after merge
+
       // 4. Update last sync timestamp
       await _storageService.saveLastSyncTimestamp(DateTime.now().millisecondsSinceEpoch);
 
       // 5. Push merged state back to cloud to ensure all devices converge
       final pushResult = await _syncService.syncToCloud(_servers);
-      
+
       notifyListeners();
-      return pushResult.success 
+      return pushResult.success
           ? SyncResult(success: true, message: 'Smart Sync completed successfully', servers: _servers)
           : SyncResult(success: false, message: 'Data merged locally but cloud update failed: ${pushResult.message}');
-          
+
     } catch (e) {
       debugPrint('SmartSync: Fatal error: $e');
       return SyncResult(success: false, message: 'Smart Sync failed: $e');
@@ -112,19 +116,21 @@ class ServerProvider extends ChangeNotifier {
 
   Future<bool> addServer(Server server) async {
     _servers.add(server);
+    _serverIndex[server.id] = _servers.length - 1; // O(1) index update
     notifyListeners();
 
     final success = await _storageService.saveServers(_servers);
     if (!success) {
       _servers.remove(server);
+      _serverIndex.remove(server.id);
       notifyListeners();
     }
     return success;
   }
 
   Future<bool> updateServer(Server server) async {
-    final index = _servers.indexWhere((s) => s.id == server.id);
-    if (index == -1) return false;
+    final index = _serverIndex[server.id]; // O(1) lookup
+    if (index == null) return false;
 
     final oldServer = _servers[index];
     _servers[index] = server;
@@ -139,26 +145,27 @@ class ServerProvider extends ChangeNotifier {
   }
 
   Future<bool> deleteServer(String id) async {
-    final index = _servers.indexWhere((s) => s.id == id);
-    if (index == -1) return false;
+    final index = _serverIndex[id]; // O(1) lookup
+    if (index == null) return false;
 
     final server = _servers.removeAt(index);
+    _serverIndex.remove(id);
+    _rebuildIndexFrom(index); // Rebuild only affected portion
     notifyListeners();
 
     final success = await _storageService.saveServers(_servers);
     if (!success) {
       _servers.insert(index, server);
+      _rebuildIndex(); // Rebuild entire index on rollback
       notifyListeners();
     }
     return success;
   }
 
+  /// O(1) lookup for server by ID
   Server? getServer(String id) {
-    try {
-      return _servers.firstWhere((s) => s.id == id);
-    } catch (e) {
-      return null;
-    }
+    final index = _serverIndex[id];
+    return index != null ? _servers[index] : null;
   }
 
   Future<SyncResult> syncToCloud() async {
@@ -169,6 +176,7 @@ class ServerProvider extends ChangeNotifier {
     final result = await _syncService.syncFromCloud();
     if (result.success && result.servers != null) {
       _servers = result.servers!;
+      _rebuildIndex(); // Rebuild index after sync
       notifyListeners();
     }
     return result;
@@ -193,5 +201,19 @@ class ServerProvider extends ChangeNotifier {
       return _servers.where((s) => s.group == null || s.group!.isEmpty).toList();
     }
     return _servers.where((s) => s.group == group).toList();
+  }
+
+  /// Rebuild entire index map
+  void _rebuildIndex() {
+    _serverIndex = {
+      for (var i = 0; i < _servers.length; i++) _servers[i].id: i
+    };
+  }
+
+  /// Rebuild index map from a specific position
+  void _rebuildIndexFrom(int fromIndex) {
+    for (var i = fromIndex; i < _servers.length; i++) {
+      _serverIndex[_servers[i].id] = i;
+    }
   }
 }

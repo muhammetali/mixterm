@@ -8,6 +8,14 @@ class NamedTerminalTheme {
   const NamedTerminalTheme(this.name, this.theme);
 }
 
+/// Named foreground colors for terminal text
+class NamedForegroundColor {
+  final String name;
+  final Color color;
+
+  const NamedForegroundColor(this.name, this.color);
+}
+
 class AppTerminalThemes {
   static final List<NamedTerminalTheme> themes = [
     NamedTerminalTheme('Default Dark', _defaultDark),
@@ -17,11 +25,66 @@ class AppTerminalThemes {
     NamedTerminalTheme('GitHub Light', _githubLight),
   ];
 
-  static TerminalTheme getTheme(String name) {
-    return themes.firstWhere(
+  /// Available foreground color options
+  static final List<NamedForegroundColor> foregroundColors = [
+    const NamedForegroundColor('Default', Color(0xFFE6EDF3)),
+    const NamedForegroundColor('Soft White', Color(0xFFD4D4D4)),
+    const NamedForegroundColor('Green', Color(0xFF00FF00)),
+    const NamedForegroundColor('Amber', Color(0xFFFFB000)),
+    const NamedForegroundColor('Cyan', Color(0xFF00FFFF)),
+    const NamedForegroundColor('Light Blue', Color(0xFF87CEEB)),
+    const NamedForegroundColor('Pink', Color(0xFFFF69B4)),
+    const NamedForegroundColor('Lime', Color(0xFFBFFF00)),
+  ];
+
+  static TerminalTheme getTheme(String name, {String? foregroundColorName}) {
+    final baseTheme = themes.firstWhere(
       (t) => t.name == name,
       orElse: () => themes.first,
     ).theme;
+
+    // If a custom foreground color is specified, apply it
+    if (foregroundColorName != null && foregroundColorName != 'Default') {
+      final fgColor = foregroundColors.firstWhere(
+        (c) => c.name == foregroundColorName,
+        orElse: () => foregroundColors.first,
+      ).color;
+
+      return TerminalTheme(
+        cursor: baseTheme.cursor,
+        selection: baseTheme.selection,
+        foreground: fgColor,
+        background: baseTheme.background,
+        black: baseTheme.black,
+        red: baseTheme.red,
+        green: baseTheme.green,
+        yellow: baseTheme.yellow,
+        blue: baseTheme.blue,
+        magenta: baseTheme.magenta,
+        cyan: baseTheme.cyan,
+        white: baseTheme.white,
+        brightBlack: baseTheme.brightBlack,
+        brightRed: baseTheme.brightRed,
+        brightGreen: baseTheme.brightGreen,
+        brightYellow: baseTheme.brightYellow,
+        brightBlue: baseTheme.brightBlue,
+        brightMagenta: baseTheme.brightMagenta,
+        brightCyan: baseTheme.brightCyan,
+        brightWhite: baseTheme.brightWhite,
+        searchHitBackground: baseTheme.searchHitBackground,
+        searchHitBackgroundCurrent: baseTheme.searchHitBackgroundCurrent,
+        searchHitForeground: baseTheme.searchHitForeground,
+      );
+    }
+
+    return baseTheme;
+  }
+
+  static Color getForegroundColor(String name) {
+    return foregroundColors.firstWhere(
+      (c) => c.name == name,
+      orElse: () => foregroundColors.first,
+    ).color;
   }
 
   // --- Theme Definitions ---

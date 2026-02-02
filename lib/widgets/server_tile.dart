@@ -10,8 +10,13 @@ import 'dialogs/add_server_dialog.dart';
 
 class ServerTile extends StatelessWidget {
   final Server server;
+  final bool isCollapsed;
 
-  const ServerTile({super.key, required this.server});
+  const ServerTile({
+    super.key,
+    required this.server,
+    this.isCollapsed = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +24,11 @@ class ServerTile extends StatelessWidget {
       builder: (context, connectionProvider, _) {
         final isSSHConnected = connectionProvider.isSSHConnected(server.id);
         final isSFTPConnected = connectionProvider.isSFTPConnected(server.id);
+        final isConnected = isSSHConnected || isSFTPConnected;
+
+        if (isCollapsed) {
+          return _buildCollapsedTile(context, isConnected);
+        }
 
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -123,6 +133,50 @@ class ServerTile extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCollapsedTile(BuildContext context, bool isConnected) {
+    return Tooltip(
+      message: '${server.name}\n${server.username}@${server.host}',
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(6),
+            onTap: () => _showConnectionOptions(context),
+            onSecondaryTap: () => _showContextMenu(context),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Center(
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppTheme.cardColor,
+                    borderRadius: BorderRadius.circular(6),
+                    border: isConnected
+                        ? Border.all(color: AppTheme.successColor, width: 2)
+                        : null,
+                  ),
+                  child: Center(
+                    child: Text(
+                      server.name.isNotEmpty ? server.name[0].toUpperCase() : 'S',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isConnected
+                            ? AppTheme.successColor
+                            : AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

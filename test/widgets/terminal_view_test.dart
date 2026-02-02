@@ -43,7 +43,8 @@ void main() {
     // Setup default behaviors
     when(() => mockSettingsProvider.fontSize).thenReturn(14);
     when(() => mockSettingsProvider.fontFamily).thenReturn('JetBrainsMono');
-    when(() => mockSettingsProvider.terminalTheme).thenReturn('default');
+    when(() => mockSettingsProvider.terminalTheme).thenReturn('Default Dark');
+    when(() => mockSettingsProvider.terminalForegroundColor).thenReturn('Default');
     when(() => mockSettingsProvider.terminalOpacity).thenReturn(1.0);
     when(() => mockSettingsProvider.pasteOnRightClick).thenReturn(true);
     when(() => mockSettingsProvider.copyOnSelect).thenReturn(true);

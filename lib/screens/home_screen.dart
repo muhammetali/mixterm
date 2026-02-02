@@ -36,9 +36,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final settingsProvider = context.read<SettingsProvider>();
     final authService = context.read<AuthService>();
 
+    // Load auth first (needed for sync decision)
     await authService.init();
-    await serverProvider.loadServers();
-    await settingsProvider.loadSettings();
+
+    // Load servers and settings in parallel (they're independent)
+    await Future.wait([
+      serverProvider.loadServers(),
+      settingsProvider.loadSettings(),
+    ]);
 
     // Automatic robust smart sync if signed in
     if (authService.isSignedIn) {
@@ -111,25 +116,33 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Row(
             children: [
-              Container(
-                width: 280,
-                decoration: const BoxDecoration(
-                  color: AppTheme.surfaceColor,
-                  border: Border(
-                    right: BorderSide(color: AppTheme.borderColor),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    _buildHeader(),
-                    const Divider(height: 1),
-                    Expanded(
-                      child: ServerList(
-                        onAddServer: _showAddServerDialog,
+              Consumer<SettingsProvider>(
+                builder: (context, settings, _) {
+                  final isCollapsed = settings.sidebarCollapsed;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    width: isCollapsed ? 60 : 280,
+                    decoration: const BoxDecoration(
+                      color: AppTheme.surfaceColor,
+                      border: Border(
+                        right: BorderSide(color: AppTheme.borderColor),
                       ),
                     ),
-                  ],
-                ),
+                    child: Column(
+                      children: [
+                        _buildHeader(isCollapsed),
+                        const Divider(height: 1),
+                        Expanded(
+                          child: ServerList(
+                            onAddServer: _showAddServerDialog,
+                            isCollapsed: isCollapsed,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
               Expanded(
                 child: Column(
@@ -199,47 +212,98 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isCollapsed) {
+    const collapsedButtonConstraints = BoxConstraints(minWidth: 40, minHeight: 40);
+
     return Container(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.terminal,
-            color: AppTheme.primaryColor,
-            size: 24,
-          ),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'MixTerm',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textColor,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          Consumer<AuthService>(
-            builder: (context, auth, _) {
-              return IconButton(
-                icon: Icon(
-                  auth.isSignedIn ? Icons.cloud_done : Icons.cloud_off,
-                  size: 20,
+      padding: EdgeInsets.all(isCollapsed ? 8 : 12),
+      child: isCollapsed
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.menu, size: 20),
+                  tooltip: 'Expand sidebar',
+                  onPressed: () => context.read<SettingsProvider>().toggleSidebar(),
+                  constraints: collapsedButtonConstraints,
+                  padding: EdgeInsets.zero,
                 ),
-                tooltip: auth.isSignedIn ? 'Sync to cloud' : 'Sign in to sync',
-                onPressed: _syncData,
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings, size: 20),
-            tooltip: 'Settings',
-            onPressed: _openSettings,
-          ),
-        ],
-      ),
+                IconButton(
+                  icon: const Icon(Icons.add, size: 20),
+                  tooltip: 'Add server',
+                  onPressed: _showAddServerDialog,
+                  constraints: collapsedButtonConstraints,
+                  padding: EdgeInsets.zero,
+                ),
+                Consumer<AuthService>(
+                  builder: (context, auth, _) {
+                    return IconButton(
+                      icon: Icon(
+                        auth.isSignedIn ? Icons.cloud_done : Icons.cloud_off,
+                        size: 20,
+                      ),
+                      tooltip: auth.isSignedIn ? 'Sync' : 'Sign in',
+                      onPressed: _syncData,
+                      constraints: collapsedButtonConstraints,
+                      padding: EdgeInsets.zero,
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.settings, size: 20),
+                  tooltip: 'Settings',
+                  onPressed: _openSettings,
+                  constraints: collapsedButtonConstraints,
+                  padding: EdgeInsets.zero,
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.menu_open, size: 20),
+                  tooltip: 'Collapse sidebar',
+                  onPressed: () => context.read<SettingsProvider>().toggleSidebar(),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.terminal,
+                  color: AppTheme.primaryColor,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'MixTerm',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textColor,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Consumer<AuthService>(
+                  builder: (context, auth, _) {
+                    return IconButton(
+                      icon: Icon(
+                        auth.isSignedIn ? Icons.cloud_done : Icons.cloud_off,
+                        size: 20,
+                      ),
+                      tooltip: auth.isSignedIn ? 'Sync to cloud' : 'Sign in to sync',
+                      onPressed: _syncData,
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.settings, size: 20),
+                  tooltip: 'Settings',
+                  onPressed: _openSettings,
+                ),
+              ],
+            ),
     );
   }
 
