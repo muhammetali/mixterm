@@ -88,11 +88,12 @@ class AppTerminalThemes {
   }
 
   // --- Theme Definitions ---
-  // Selection colors are now solid (not transparent) for better contrast
+  // Selection colors use 50% transparency so text remains visible underneath
+  // (xterm draws selection OVER text, so opaque colors hide the text)
 
   static final _defaultDark = TerminalTheme(
     cursor: const Color(0xFF00D4AA),
-    selection: const Color(0xFF264F78), // Solid blue for selection - high contrast
+    selection: const Color(0x80FFFFFF), // 50% white - creates inverted look on dark bg
     foreground: const Color(0xFFE6EDF3),
     background: Colors.transparent,
     black: const Color(0xFF000000),
@@ -118,7 +119,7 @@ class AppTerminalThemes {
 
   static final _dracula = TerminalTheme(
     cursor: const Color(0xFFF8F8F2),
-    selection: const Color(0xFF44475A), // Dracula selection color - solid
+    selection: const Color(0x80FFFFFF), // 50% white for visibility
     foreground: const Color(0xFFF8F8F2),
     background: Colors.transparent,
     black: const Color(0xFF21222C),
@@ -144,7 +145,7 @@ class AppTerminalThemes {
 
   static final _solarizedDark = TerminalTheme(
     cursor: const Color(0xFF839496),
-    selection: const Color(0xFF073642), // Solarized base02 - solid
+    selection: const Color(0x80FFFFFF), // 50% white for visibility
     foreground: const Color(0xFF839496),
     background: Colors.transparent,
     black: const Color(0xFF073642),
@@ -170,7 +171,7 @@ class AppTerminalThemes {
 
   static final _monokai = TerminalTheme(
     cursor: const Color(0xFFF8F8F2),
-    selection: const Color(0xFF49483E), // Monokai selection - solid
+    selection: const Color(0x80FFFFFF), // 50% white for visibility
     foreground: const Color(0xFFF8F8F2),
     background: Colors.transparent,
     black: const Color(0xFF272822),
@@ -196,7 +197,7 @@ class AppTerminalThemes {
 
   static final _githubLight = TerminalTheme(
     cursor: const Color(0xFF044289),
-    selection: const Color(0xFFCCEAE7), // Light blue for light theme - solid
+    selection: const Color(0x80000000), // 50% black for light theme
     foreground: const Color(0xFF24292E),
     background: Colors.transparent,
     black: const Color(0xFF24292E),
