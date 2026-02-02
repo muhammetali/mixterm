@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../providers/settings_provider.dart';
 import '../providers/server_provider.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
+import '../services/export_import_service.dart';
 import '../utils/terminal_themes.dart';
 import '../utils/theme.dart';
 import '../utils/constants.dart';
@@ -112,8 +114,13 @@ class SettingsScreen extends StatelessWidget {
                 'Cloud Sync',
                 [
                   _GoogleAccountTile(),
-                  const Divider(),
-                  _MigrationTile(),
+                ],
+              ),
+              const SizedBox(height: 24),
+              _buildSection(
+                'Data',
+                [
+                  _ExportImportTile(),
                 ],
               ),
               const SizedBox(height: 24),
@@ -459,113 +466,311 @@ class _GoogleAccountTileState extends State<_GoogleAccountTile> {
   }
 }
 
-class _MigrationTile extends StatefulWidget {
+class _ExportImportTile extends StatefulWidget {
   @override
-  State<_MigrationTile> createState() => _MigrationTileState();
+  State<_ExportImportTile> createState() => _ExportImportTileState();
 }
 
-class _MigrationTileState extends State<_MigrationTile> {
-  bool _isMigrating = false;
+class _ExportImportTileState extends State<_ExportImportTile> {
+  bool _isExporting = false;
+  bool _isImporting = false;
 
-  Future<void> _showMigrationDialog() async {
-    final passwordController = TextEditingController();
+  Future<void> _handleExport() async {
+    final serverProvider = context.read<ServerProvider>();
+    final servers = serverProvider.servers;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Migrate Cloud Data'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'If your cloud data was encrypted with an old master password, '
-              'enter it below to recover your servers.',
-              style: TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Old Master Password',
-                border: OutlineInputBorder(),
-                hintText: 'Enter your previous master password',
-              ),
-              autofocus: true,
-            ),
-          ],
+    if (servers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No servers to export'),
+          backgroundColor: AppTheme.warningColor,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Migrate'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || passwordController.text.isEmpty) {
-      passwordController.dispose();
+      );
       return;
     }
 
-    final oldPassword = passwordController.text;
-    passwordController.dispose();
+    // Show format selection dialog
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _ExportOptionsDialog(serverCount: servers.length),
+    );
 
-    setState(() => _isMigrating = true);
+    if (result == null) return;
+
+    final format = result['format'] as ExportFormat;
+    final includeSecrets = result['includeSecrets'] as bool;
+
+    // Get save location
+    final extension = format == ExportFormat.json ? 'json' :
+                      format == ExportFormat.csv ? 'csv' : 'config';
+
+    final outputPath = await FilePicker.platform.saveFile(
+      dialogTitle: 'Export Servers',
+      fileName: 'mixterm_servers.$extension',
+      type: FileType.custom,
+      allowedExtensions: [extension],
+    );
+
+    if (outputPath == null) return;
+
+    setState(() => _isExporting = true);
 
     try {
-      final serverProvider = context.read<ServerProvider>();
-      final result = await serverProvider.migrateFromMasterPassword(oldPassword);
+      final exportResult = await ExportImportService.exportToFile(
+        servers,
+        outputPath,
+        format,
+        includeSecrets: includeSecrets,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.message),
-            backgroundColor: result.success ? AppTheme.successColor : AppTheme.errorColor,
+            content: Text(exportResult.message),
+            backgroundColor: exportResult.success ? AppTheme.successColor : AppTheme.errorColor,
           ),
         );
       }
     } finally {
       if (mounted) {
-        setState(() => _isMigrating = false);
+        setState(() => _isExporting = false);
+      }
+    }
+  }
+
+  Future<void> _handleImport() async {
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: 'Import Servers',
+      type: FileType.custom,
+      allowedExtensions: ['json', 'csv', 'config', 'txt'],
+    );
+
+    if (result == null || result.files.isEmpty) return;
+
+    final filePath = result.files.first.path;
+    if (filePath == null) return;
+
+    setState(() => _isImporting = true);
+
+    try {
+      final importResult = await ExportImportService.importFromFile(filePath);
+
+      if (!importResult.success || importResult.servers == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(importResult.message),
+              backgroundColor: AppTheme.errorColor,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Show confirmation dialog
+      if (!mounted) return;
+
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Import Servers'),
+          content: Text(
+            'Found ${importResult.servers!.length} servers.\n\n'
+            'How would you like to import them?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, null),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Merge'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Replace All'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == null || !mounted) return;
+
+      final serverProvider = context.read<ServerProvider>();
+
+      if (confirm) {
+        // Replace all - clear existing and add new
+        for (final server in serverProvider.servers.toList()) {
+          await serverProvider.deleteServer(server.id);
+        }
+      }
+
+      // Add imported servers
+      int addedCount = 0;
+      for (final server in importResult.servers!) {
+        final success = await serverProvider.addServer(server);
+        if (success) addedCount++;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Imported $addedCount servers successfully'),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isImporting = false);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthService>(
-      builder: (context, auth, _) {
-        if (!auth.isSignedIn) {
-          return const SizedBox.shrink();
-        }
-
-        return ListTile(
-          leading: const Icon(Icons.restore, color: AppTheme.warningColor),
-          title: const Text('Recover Old Cloud Data'),
-          subtitle: const Text(
-            'Decrypt cloud data that was encrypted with master password',
-            style: TextStyle(fontSize: 12),
-          ),
-          trailing: _isMigrating
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.upload_file),
+          title: const Text('Export Servers'),
+          subtitle: const Text('Save servers to JSON, CSV, or SSH config'),
+          trailing: _isExporting
               ? const SizedBox(
                   width: 24,
                   height: 24,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : IconButton(
-                  icon: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onPressed: _showMigrationDialog,
-                ),
-          onTap: _isMigrating ? null : _showMigrationDialog,
-        );
-      },
+              : const Icon(Icons.arrow_forward_ios, size: 16),
+          onTap: _isExporting ? null : _handleExport,
+        ),
+        const Divider(height: 1),
+        ListTile(
+          leading: const Icon(Icons.download),
+          title: const Text('Import Servers'),
+          subtitle: const Text('Load servers from file (auto-detects format)'),
+          trailing: _isImporting
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.arrow_forward_ios, size: 16),
+          onTap: _isImporting ? null : _handleImport,
+        ),
+      ],
     );
   }
 }
+
+class _ExportOptionsDialog extends StatefulWidget {
+  final int serverCount;
+
+  const _ExportOptionsDialog({required this.serverCount});
+
+  @override
+  State<_ExportOptionsDialog> createState() => _ExportOptionsDialogState();
+}
+
+class _ExportOptionsDialogState extends State<_ExportOptionsDialog> {
+  ExportFormat _selectedFormat = ExportFormat.json;
+  bool _includeSecrets = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Export Options'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Exporting ${widget.serverCount} servers'),
+          const SizedBox(height: 16),
+          const Text('Format:', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          _buildFormatOption(
+            ExportFormat.json,
+            'JSON',
+            'Universal format, compatible with Termius',
+          ),
+          _buildFormatOption(
+            ExportFormat.csv,
+            'CSV',
+            'Spreadsheet format, for Excel/Sheets',
+          ),
+          _buildFormatOption(
+            ExportFormat.sshConfig,
+            'SSH Config',
+            'OpenSSH format (~/.ssh/config)',
+          ),
+          const SizedBox(height: 16),
+          if (_selectedFormat != ExportFormat.sshConfig) ...[
+            CheckboxListTile(
+              title: const Text('Include passwords & keys'),
+              subtitle: Text(
+                _includeSecrets
+                    ? 'Sensitive data will be included'
+                    : 'Only server info (safer for sharing)',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _includeSecrets ? AppTheme.warningColor : AppTheme.textSecondary,
+                ),
+              ),
+              value: _includeSecrets,
+              onChanged: (value) => setState(() => _includeSecrets = value ?? false),
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.warningColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: AppTheme.warningColor),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'SSH config format cannot include passwords (security by design)',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, {
+            'format': _selectedFormat,
+            'includeSecrets': _includeSecrets && _selectedFormat != ExportFormat.sshConfig,
+          }),
+          child: const Text('Export'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormatOption(ExportFormat format, String title, String subtitle) {
+    return RadioListTile<ExportFormat>(
+      title: Text(title),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+      value: format,
+      groupValue: _selectedFormat,
+      onChanged: (value) => setState(() => _selectedFormat = value!),
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+    );
+  }
+}
+

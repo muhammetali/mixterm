@@ -191,16 +191,6 @@ class ServerProvider extends ChangeNotifier {
     return await _syncService.deleteCloudData();
   }
 
-  /// Migrates cloud data from old master password encryption to new Google ID encryption
-  Future<MigrationResult> migrateFromMasterPassword(String oldMasterPassword) async {
-    final result = await _syncService.migrateFromMasterPassword(oldMasterPassword);
-    if (result.success && result.servers != null) {
-      _servers = result.servers!;
-      _rebuildIndex();
-      notifyListeners();
-    }
-    return result;
-  }
 
   List<String> get groups {
     final groupSet = <String>{};
