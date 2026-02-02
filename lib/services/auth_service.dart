@@ -8,13 +8,20 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService extends ChangeNotifier {
-  static const String _clientId = '449803261214-6p5oc4no7cav8gh7kj4am1qg9elvk55u.apps.googleusercontent.com';
-  static const String _clientSecret = '***REMOVED***';
+  // OAuth Client ID - Desktop apps use PKCE, client_secret can be empty
+  // Get your own Client ID from Google Cloud Console:
+  // 1. Create a new project or select existing
+  // 2. Enable Google Drive API
+  // 3. Create OAuth 2.0 Client ID (Desktop app type)
+  // 4. Replace this with your Client ID
+  static const String _clientId = String.fromEnvironment(
+    'GOOGLE_CLIENT_ID',
+    defaultValue: '449803261214-6p5oc4no7cav8gh7kj4am1qg9elvk55u.apps.googleusercontent.com',
+  );
 
   static const List<String> _scopes = [
     'email',
     'https://www.googleapis.com/auth/drive.appdata',
-    'https://www.googleapis.com/auth/drive.file',
   ];
 
   static const String _credentialsKey = 'google_credentials';
@@ -24,13 +31,16 @@ class AuthService extends ChangeNotifier {
   String? _userEmail;
   String? _userName;
   String? _userPhoto;
+  String? _userId;
 
   bool get isSignedIn => _authClient != null;
   String? get userEmail => _userEmail;
   String? get userName => _userName;
   String? get userPhoto => _userPhoto;
+  String? get userId => _userId;
 
-  final _clientIdentifier = ClientId(_clientId, _clientSecret);
+  // Desktop apps should use empty client_secret with PKCE
+  final _clientIdentifier = ClientId(_clientId, '');
 
   Future<void> init() async {
     try {
@@ -68,6 +78,7 @@ class AuthService extends ChangeNotifier {
           _userEmail = userInfo['email'];
           _userName = userInfo['name'];
           _userPhoto = userInfo['picture'];
+          _userId = userInfo['id'];
         }
 
         notifyListeners();
@@ -117,6 +128,7 @@ class AuthService extends ChangeNotifier {
         _userEmail = userInfo['email'];
         _userName = userInfo['name'];
         _userPhoto = userInfo['picture'];
+        _userId = userInfo['id'];
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_userInfoKey, response.body);
@@ -141,6 +153,7 @@ class AuthService extends ChangeNotifier {
     _userEmail = null;
     _userName = null;
     _userPhoto = null;
+    _userId = null;
 
     notifyListeners();
   }

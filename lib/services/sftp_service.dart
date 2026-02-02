@@ -113,89 +113,100 @@ class SFTPService {
     }
   }
 
-    Future<bool> downloadFile(
-      String remotePath,
-      String localPath, {
-      Function(int received, int total)? onProgress,
-      bool Function()? checkCancelled,
-    }) async {
-      if (_sftpClient == null) return false;
-  
-      try {
-        final file = await _sftpClient!.open(remotePath);
-        final stat = await file.stat();
-        final totalBytes = stat.size ?? 0;
-        final localFile = File(localPath).openWrite();
-  
-        int receivedBytes = 0;
-  
-        await for (final chunk in file.read(length: totalBytes > 0 ? totalBytes : null)) {
-          if (checkCancelled?.call() == true) {
-            await localFile.close();
-            await File(localPath).delete(); // Cleanup partial file
-            return false;
-          }
-          
-          localFile.add(chunk);
-          receivedBytes += chunk.length;
-          if (onProgress != null && totalBytes > 0) {
-            onProgress(receivedBytes, totalBytes);
-          }
-        }
-  
-        await localFile.flush();
-        await localFile.close();
-        return true;
-      } catch (e) {
-        debugPrint('SFTP Download Error: $e');
-        return false;
-      }
-    }
-    Future<bool> uploadFile(
-      String localPath,
-      String remotePath, {
-      Function(int sent, int total)? onProgress,
-      bool Function()? checkCancelled,
-    }) async {
-      if (_sftpClient == null) return false;
-  
-      try {
-        final localFile = File(localPath);
-        final totalBytes = await localFile.length();
-        final remoteFile = await _sftpClient!.open(
-          remotePath,
-          mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.truncate,
-        );
-  
-        final stream = localFile.openRead();
-        int sentBytes = 0;
-  
-        await for (final chunk in stream) {
-          if (checkCancelled?.call() == true) {
-            // We can't easily close the remote file handle gracefully here during a write loop 
-            // without potentially stalling, but we stop sending.
-            // Ideally we would close remoteFile, but let's just break.
-             break; 
-          }
-  
-          await remoteFile.writeBytes(Uint8List.fromList(chunk));
-          sentBytes += chunk.length;
-          if (onProgress != null) {
-            onProgress(sentBytes, totalBytes);
-          }
-        }
-        
+  Future<bool> downloadFile(
+    String remotePath,
+    String localPath, {
+    Function(int received, int total)? onProgress,
+    bool Function()? checkCancelled,
+  }) async {
+    if (_sftpClient == null) return false;
+
+    SftpFile? file;
+    IOSink? localFile;
+    try {
+      file = await _sftpClient!.open(remotePath);
+      final stat = await file.stat();
+      final totalBytes = stat.size ?? 0;
+      localFile = File(localPath).openWrite();
+
+      int receivedBytes = 0;
+
+      await for (final chunk in file.read(length: totalBytes > 0 ? totalBytes : null)) {
         if (checkCancelled?.call() == true) {
-           // Cleanup if possible?
-           return false;
+          await localFile.close();
+          await file.close();
+          await File(localPath).delete();
+          return false;
         }
-  
-        return true;
-      } catch (e) {
-        debugPrint('SFTP Upload Error: $e');
-        return false;
+
+        localFile.add(chunk);
+        receivedBytes += chunk.length;
+        if (onProgress != null && totalBytes > 0) {
+          onProgress(receivedBytes, totalBytes);
+        }
       }
+
+      await localFile.flush();
+      await localFile.close();
+      await file.close();
+      return true;
+    } catch (e) {
+      debugPrint('SFTP Download Error: $e');
+      return false;
+    } finally {
+      try {
+        await localFile?.close();
+      } catch (_) {}
+      try {
+        await file?.close();
+      } catch (_) {}
     }
+  }
+  Future<bool> uploadFile(
+    String localPath,
+    String remotePath, {
+    Function(int sent, int total)? onProgress,
+    bool Function()? checkCancelled,
+  }) async {
+    if (_sftpClient == null) return false;
+
+    SftpFile? remoteFile;
+    try {
+      final localFile = File(localPath);
+      final totalBytes = await localFile.length();
+      remoteFile = await _sftpClient!.open(
+        remotePath,
+        mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.truncate,
+      );
+
+      final stream = localFile.openRead();
+      int sentBytes = 0;
+      bool cancelled = false;
+
+      await for (final chunk in stream) {
+        if (checkCancelled?.call() == true) {
+          cancelled = true;
+          break;
+        }
+
+        await remoteFile.writeBytes(Uint8List.fromList(chunk));
+        sentBytes += chunk.length;
+        if (onProgress != null) {
+          onProgress(sentBytes, totalBytes);
+        }
+      }
+
+      await remoteFile.close();
+      return !cancelled;
+    } catch (e) {
+      debugPrint('SFTP Upload Error: $e');
+      return false;
+    } finally {
+      try {
+        await remoteFile?.close();
+      } catch (_) {}
+    }
+  }
   Future<bool> createDirectory(String path) async {
     if (_sftpClient == null) return false;
 
@@ -236,11 +247,18 @@ class SFTPService {
   Future<Uint8List?> readFile(String path) async {
     if (_sftpClient == null) return null;
 
+    SftpFile? file;
     try {
-      final file = await _sftpClient!.open(path);
-      return await file.readBytes();
+      file = await _sftpClient!.open(path);
+      final bytes = await file.readBytes();
+      await file.close();
+      return bytes;
     } catch (e) {
       return null;
+    } finally {
+      try {
+        await file?.close();
+      } catch (_) {}
     }
   }
 

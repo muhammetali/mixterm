@@ -17,7 +17,7 @@ void main() async {
 
   final prefs = await SharedPreferences.getInstance();
   final storageService = StorageService(prefs);
-  await storageService.init();
+  // Note: storage.init() is called in AppWrapper to properly sequence with auth
 
   final authService = AuthService();
   final syncService = SyncService(authService, storageService);

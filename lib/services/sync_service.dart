@@ -22,26 +22,25 @@ class SyncService {
     }
 
     try {
-      final masterPassword = _storageService.masterPassword;
+      final encryptionKey = _storageService.encryptionKey;
       final salt = _storageService.salt;
 
-      if (masterPassword == null || salt == null) {
-        return SyncResult(success: false, message: 'Master password not set');
+      if (encryptionKey == null || salt == null) {
+        return SyncResult(success: false, message: 'Encryption not initialized');
       }
 
       final jsonData = json.encode({
-        'version': 1,
+        'version': 2, // Bumped version for new encryption scheme
         'servers': servers.map((s) => s.toJson()).toList(),
         'updatedAt': DateTime.now().toIso8601String(),
       });
 
-      final encryptedData =
-          CryptoService.encrypt(jsonData, masterPassword, salt);
+      final encryptedData = CryptoService.encryptWithKey(jsonData, encryptionKey);
 
       final fileContent = json.encode({
         'salt': salt,
         'data': encryptedData,
-        'checksum': CryptoService.hashPassword(jsonData),
+        'checksum': CryptoService.hashData(jsonData),
       });
 
       final folderId = await _getOrCreateFolder(driveApi);
@@ -79,10 +78,10 @@ class SyncService {
     }
 
     try {
-      final masterPassword = _storageService.masterPassword;
-      if (masterPassword == null) {
-        debugPrint('Sync: Master password not set');
-        return SyncResult(success: false, message: 'Master password not set');
+      final encryptionKey = _storageService.encryptionKey;
+      if (encryptionKey == null) {
+        debugPrint('Sync: Encryption key not available');
+        return SyncResult(success: false, message: 'Encryption not initialized');
       }
 
       final folderId = await _getOrCreateFolder(driveApi);
@@ -104,23 +103,20 @@ class SyncService {
       final content = utf8.decode(bytes);
       final cloudData = json.decode(content);
 
-      final cloudSalt = cloudData['salt'] as String;
       final encryptedData = cloudData['data'] as String;
 
-      debugPrint('Sync: Attempting to decrypt cloud data with provided salt');
-      final decrypted =
-          CryptoService.decrypt(encryptedData, masterPassword, cloudSalt);
+      debugPrint('Sync: Attempting to decrypt cloud data');
+      final decrypted = CryptoService.decryptWithKey(encryptedData, encryptionKey);
 
       if (decrypted == null) {
-        debugPrint('Sync: Decryption failed - possible master password mismatch');
+        debugPrint('Sync: Decryption failed - encryption key mismatch');
         return SyncResult(
-            success: false, message: 'Failed to decrypt cloud data');
+            success: false, message: 'Failed to decrypt cloud data. Make sure you are using the same Google account.');
       }
 
       final jsonData = json.decode(decrypted);
       final serversList = jsonData['servers'] as List;
-      final servers =
-          serversList.map((s) => Server.fromJson(s)).toList();
+      final servers = serversList.map((s) => Server.fromJson(s)).toList();
 
       debugPrint('Sync: Successfully decrypted ${servers.length} servers');
       await _storageService.saveServers(servers);
@@ -136,7 +132,6 @@ class SyncService {
   Future<String> _getOrCreateFolder(drive.DriveApi driveApi) async {
     try {
       debugPrint('Sync: Looking for folder "$_folderName" in appDataFolder');
-      // We use 'appDataFolder' space which is private to the app and more reliable
       final query = "name='$_folderName' and mimeType='application/vnd.google-apps.folder' and trashed=false";
       final result = await driveApi.files.list(q: query, spaces: 'appDataFolder');
 

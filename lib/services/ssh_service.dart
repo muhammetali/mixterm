@@ -28,6 +28,8 @@ class SSHService {
   SSHClient? _client;
   SSHSession? _session;
   Timer? _keepAliveTimer;
+  StreamSubscription<Uint8List>? _stdoutSubscription;
+  StreamSubscription<Uint8List>? _stderrSubscription;
   final StreamController<String> _outputController =
       StreamController<String>.broadcast();
   final StreamController<SSHConnectionState> _stateController =
@@ -103,11 +105,11 @@ class SSHService {
       );
       debugPrint('SSH: Shell session started');
 
-      _session!.stdout.listen((data) {
+      _stdoutSubscription = _session!.stdout.listen((data) {
         _outputController.add(utf8.decode(data, allowMalformed: true));
       });
 
-      _session!.stderr.listen((data) {
+      _stderrSubscription = _session!.stderr.listen((data) {
         _outputController.add(utf8.decode(data, allowMalformed: true));
       });
 
@@ -161,15 +163,25 @@ class SSHService {
 
   Future<void> disconnect() async {
     _keepAliveTimer?.cancel();
+    await _stdoutSubscription?.cancel();
+    await _stderrSubscription?.cancel();
+    _stdoutSubscription = null;
+    _stderrSubscription = null;
     _session?.close();
     _client?.close();
     _session = null;
     _client = null;
-    _stateController.add(SSHConnectionState.disconnected);
+    if (!_stateController.isClosed) {
+      _stateController.add(SSHConnectionState.disconnected);
+    }
   }
 
   void dispose() {
-    disconnect();
+    _keepAliveTimer?.cancel();
+    _stdoutSubscription?.cancel();
+    _stderrSubscription?.cancel();
+    _session?.close();
+    _client?.close();
     _outputController.close();
     _stateController.close();
   }

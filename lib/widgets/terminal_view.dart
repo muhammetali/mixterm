@@ -226,23 +226,27 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
         Expanded(
           child: Stack(
             children: [
-              Container(
-                color: AppTheme.terminalBackground.withValues(alpha: settings.terminalOpacity),
-                child: TerminalView(
-                  _terminal!,
-                  controller: _terminalController,
-                  theme: _buildTerminalTheme(context),
-                  autofocus: true,
-                  alwaysShowCursor: true,
-                  textStyle: TerminalStyle(
-                    fontSize: settings.fontSize.toDouble(),
-                    fontFamily: settings.fontFamily,
+              KeyboardListener(
+                focusNode: FocusNode(),
+                onKeyEvent: _handleKeyEvent,
+                child: Container(
+                  color: AppTheme.terminalBackground.withValues(alpha: settings.terminalOpacity),
+                  child: TerminalView(
+                    _terminal!,
+                    controller: _terminalController,
+                    theme: _buildTerminalTheme(context),
+                    autofocus: true,
+                    alwaysShowCursor: true,
+                    textStyle: TerminalStyle(
+                      fontSize: settings.fontSize.toDouble(),
+                      fontFamily: settings.fontFamily,
+                    ),
+                    onSecondaryTapDown: (details, offset) {
+                       if (settings.pasteOnRightClick) {
+                        _pasteFromClipboard();
+                      }
+                    },
                   ),
-                  onSecondaryTapDown: (details, offset) {
-                     if (settings.pasteOnRightClick) {
-                      _pasteFromClipboard();
-                    }
-                  },
                 ),
               ),
               // Connection overlay
@@ -475,6 +479,24 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     if (data?.text != null) {
       _sshService?.write(data!.text!);
+    }
+  }
+
+  /// Handle keyboard events for special key combinations
+  /// Note: Shift+click to bypass mouse tracking is handled at the xterm level
+  void _handleKeyEvent(KeyEvent event) {
+    // Ctrl+Shift+C to copy
+    if (event is KeyDownEvent) {
+      final ctrl = HardwareKeyboard.instance.isControlPressed;
+      final shift = HardwareKeyboard.instance.isShiftPressed;
+
+      if (ctrl && shift && event.logicalKey == LogicalKeyboardKey.keyC) {
+        _copySelection();
+      }
+      // Ctrl+Shift+V to paste
+      else if (ctrl && shift && event.logicalKey == LogicalKeyboardKey.keyV) {
+        _pasteFromClipboard();
+      }
     }
   }
 }

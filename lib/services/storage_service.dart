@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/server.dart';
@@ -9,14 +10,15 @@ class StorageService {
   static const String _serversKey = 'servers';
   static const String _backupServersKey = 'servers_backup';
   static const String _settingsKey = 'settings';
-  static const String _masterPasswordHashKey = 'master_password_hash';
   static const String _saltKey = 'encryption_salt';
   static const String _googleUserKey = 'google_user';
   static const String _lastSyncKey = 'last_sync_timestamp';
+  static const String _encryptionModeKey = 'encryption_mode'; // 'device' or 'google'
 
   final SharedPreferences _prefs;
-  String? _masterPassword;
   String? _salt;
+  Uint8List? _encryptionKey;
+  String _encryptionMode = 'device'; // 'device' or 'google'
 
   StorageService(this._prefs);
 
@@ -26,37 +28,77 @@ class StorageService {
       _salt = CryptoService.generateSalt();
       await _prefs.setString(_saltKey, _salt!);
     }
+
+    _encryptionMode = _prefs.getString(_encryptionModeKey) ?? 'device';
+
+    // Initialize with device key by default
+    _encryptionKey = await CryptoService.deriveKeyFromDevice(_salt!);
   }
 
-  bool get hasMasterPassword =>
-      _prefs.getString(_masterPasswordHashKey) != null;
+  /// Switches to Google-based encryption when user signs in
+  Future<void> switchToGoogleEncryption(String googleUserId) async {
+    if (_salt == null) return;
 
-  bool get isUnlocked => _masterPassword != null;
+    final oldKey = _encryptionKey;
+    final newKey = CryptoService.deriveKeyFromGoogleId(googleUserId, _salt!);
 
-  Future<bool> setMasterPassword(String password) async {
-    final hash = CryptoService.hashPassword(password);
-    await _prefs.setString(_masterPasswordHashKey, hash);
-    _masterPassword = password;
-    return true;
+    // Re-encrypt existing data with new key
+    await _reEncryptData(oldKey!, newKey);
+
+    _encryptionKey = newKey;
+    _encryptionMode = 'google';
+    await _prefs.setString(_encryptionModeKey, 'google');
   }
 
-  bool verifyMasterPassword(String password) {
-    final storedHash = _prefs.getString(_masterPasswordHashKey);
-    if (storedHash == null) return false;
+  /// Switches back to device-based encryption when user signs out
+  Future<void> switchToDeviceEncryption() async {
+    if (_salt == null) return;
 
-    if (CryptoService.verifyPassword(password, storedHash)) {
-      _masterPassword = password;
-      return true;
+    final oldKey = _encryptionKey;
+    final newKey = await CryptoService.deriveKeyFromDevice(_salt!);
+
+    // Re-encrypt existing data with device key
+    await _reEncryptData(oldKey!, newKey);
+
+    _encryptionKey = newKey;
+    _encryptionMode = 'device';
+    await _prefs.setString(_encryptionModeKey, 'device');
+  }
+
+  /// Re-initializes encryption with Google ID (for when user was already signed in)
+  Future<void> initWithGoogleId(String googleUserId) async {
+    if (_salt == null) return;
+
+    if (_encryptionMode == 'google') {
+      _encryptionKey = CryptoService.deriveKeyFromGoogleId(googleUserId, _salt!);
     }
-    return false;
   }
 
-  void lock() {
-    _masterPassword = null;
+  Future<void> _reEncryptData(Uint8List oldKey, Uint8List newKey) async {
+    final encryptedData = _prefs.getString(_serversKey);
+    if (encryptedData == null) return;
+
+    // Decrypt with old key
+    final decrypted = CryptoService.decryptWithKey(encryptedData, oldKey);
+    if (decrypted == null) return;
+
+    // Encrypt with new key
+    final reEncrypted = CryptoService.encryptWithKey(decrypted, newKey);
+    await _prefs.setString(_serversKey, reEncrypted);
+
+    // Also re-encrypt backup if exists
+    final backupData = _prefs.getString(_backupServersKey);
+    if (backupData != null) {
+      final decryptedBackup = CryptoService.decryptWithKey(backupData, oldKey);
+      if (decryptedBackup != null) {
+        final reEncryptedBackup = CryptoService.encryptWithKey(decryptedBackup, newKey);
+        await _prefs.setString(_backupServersKey, reEncryptedBackup);
+      }
+    }
   }
 
   Future<List<Server>> loadServers({bool useBackup = false}) async {
-    if (_masterPassword == null || _salt == null) return [];
+    if (_encryptionKey == null || _salt == null) return [];
 
     final key = useBackup ? _backupServersKey : _serversKey;
     final encryptedData = _prefs.getString(key);
@@ -65,9 +107,8 @@ class StorageService {
       return [];
     }
 
-    final decrypted =
-        CryptoService.decrypt(encryptedData, _masterPassword!, _salt!);
-    
+    final decrypted = CryptoService.decryptWithKey(encryptedData, _encryptionKey!);
+
     if (decrypted == null) {
       if (!useBackup) {
         debugPrint('Decryption failed for primary storage, trying backup...');
@@ -87,7 +128,7 @@ class StorageService {
   }
 
   Future<bool> saveServers(List<Server> servers, {bool createBackup = true}) async {
-    if (_masterPassword == null || _salt == null) return false;
+    if (_encryptionKey == null || _salt == null) return false;
 
     try {
       // Create backup of current state before overwriting
@@ -99,8 +140,7 @@ class StorageService {
       }
 
       final jsonString = json.encode(servers.map((e) => e.toJson()).toList());
-      final encrypted =
-          CryptoService.encrypt(jsonString, _masterPassword!, _salt!);
+      final encrypted = CryptoService.encryptWithKey(jsonString, _encryptionKey!);
       await _prefs.setString(_serversKey, encrypted);
       return true;
     } catch (e) {
@@ -147,7 +187,8 @@ class StorageService {
   }
 
   String? get salt => _salt;
-  String? get masterPassword => _masterPassword;
+  String get encryptionMode => _encryptionMode;
+  Uint8List? get encryptionKey => _encryptionKey;
 
   Future<String?> getEncryptedServersData() async {
     return _prefs.getString(_serversKey);

@@ -22,7 +22,12 @@ class TabProvider extends ChangeNotifier {
   Terminal getOrCreateTerminal(String tabId) {
     if (!_terminals.containsKey(tabId)) {
       _terminals[tabId] = Terminal(maxLines: 10000);
-      _terminalControllers[tabId] = TerminalController();
+      // Create controller with pointer input disabled for mouse events
+      // This allows text selection to work even when terminal apps have mouse tracking
+      // Only tap events go to terminal, drag events are used for selection
+      _terminalControllers[tabId] = TerminalController(
+        pointerInputs: const PointerInputs({}), // Disable all pointer forwarding to terminal
+      );
     }
     return _terminals[tabId]!;
   }

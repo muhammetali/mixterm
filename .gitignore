@@ -23,6 +23,9 @@ linux/flutter/ephemeral/
 !pubspec.json
 !Contents.json
 client_secret_*.json
+.env
+.env.*
+!.env.example
 
 # Generated
 *.g.dart

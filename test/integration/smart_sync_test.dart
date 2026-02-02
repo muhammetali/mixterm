@@ -3,12 +3,10 @@ import 'package:mixterm/models/server.dart';
 import 'package:mixterm/providers/server_provider.dart';
 import 'package:mixterm/services/sync_service.dart';
 import 'package:mixterm/services/storage_service.dart';
-import 'package:mixterm/services/auth_service.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockSyncService extends Mock implements SyncService {}
-class MockAuthService extends Mock implements AuthService {}
 
 void main() {
   late ServerProvider serverProvider;
@@ -20,15 +18,13 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     storageService = StorageService(prefs);
     await storageService.init();
-    
-    // Set a dummy master password to enable encryption/decryption
-    await storageService.setMasterPassword('test_password');
+    // Encryption is now automatically initialized with device key
 
     mockSyncService = MockSyncService();
     serverProvider = ServerProvider(storageService, mockSyncService);
 
     // Register fallback for mocktail
-    registerFallbackValue([]);
+    registerFallbackValue(<Server>[]);
   });
 
   group('Smart Sync Robustness Tests (Mocktail)', () {
@@ -59,7 +55,7 @@ void main() {
             message: 'Cloud data found',
             servers: [cloudServer],
           ));
-      
+
       when(() => mockSyncService.syncToCloud(any())).thenAnswer((_) async => SyncResult(
             success: true,
             message: 'Synced to cloud',
@@ -80,12 +76,12 @@ void main() {
         return SyncResult(success: true, message: 'Success', servers: []);
       });
 
-      when(() => mockSyncService.syncToCloud(any())).thenAnswer((_) async => 
+      when(() => mockSyncService.syncToCloud(any())).thenAnswer((_) async =>
           SyncResult(success: true, message: 'Success'));
 
       // Start first sync
       final firstSync = serverProvider.performSmartSync();
-      
+
       // Start second sync immediately
       final secondSync = serverProvider.performSmartSync();
 
