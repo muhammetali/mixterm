@@ -88,8 +88,8 @@ class AppTerminalThemes {
   }
 
   // --- Theme Definitions ---
-  // Selection colors use 50% transparency so text remains visible underneath
-  // (xterm draws selection OVER text, so opaque colors hide the text)
+  // Selection colors use 50% opacity so text remains visible underneath
+  // (xterm draws selection OVER text, so fully opaque colors hide the text)
 
   static final _defaultDark = TerminalTheme(
     cursor: const Color(0xFF00D4AA),

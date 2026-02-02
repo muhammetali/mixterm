@@ -243,6 +243,7 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
                 onKeyEvent: _handleKeyEvent,
                 child: Container(
                   color: AppTheme.terminalBackground.withValues(alpha: terminalOpacity),
+                  padding: const EdgeInsets.all(8), // Terminal padding
                   child: TerminalView(
                     _terminal!,
                     controller: _terminalController,
