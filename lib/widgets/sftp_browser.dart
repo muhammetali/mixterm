@@ -34,6 +34,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
   bool _isDragging = false;
   bool _isFetching = false;
   SFTPService? _sftpService;
+  String? _selectedItem; // Currently selected file/folder name
 
   @override
   void initState() {
@@ -136,6 +137,9 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
   }
 
   void _navigateTo(String path) {
+    setState(() {
+      _selectedItem = null; // Clear selection when navigating
+    });
     _loadDirectory(path);
   }
 
@@ -723,6 +727,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
   Widget _buildFileItem(SftpName item) {
     final isDir = item.attr.isDirectory;
     final filename = item.filename;
+    final isSelected = _selectedItem == filename;
 
     return Draggable<Map<String, dynamic>>(
       data: {
@@ -757,17 +762,39 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
           ),
         ),
       ),
-      child: InkWell(
+      child: GestureDetector(
         onTap: () {
+          // Single tap: select item
+          setState(() {
+            _selectedItem = filename;
+          });
+        },
+        onDoubleTap: () {
+          // Double tap: open directory or download file
           if (isDir) {
             _navigateTo(_getFullPath(filename));
+          } else {
+            _downloadFile(filename);
           }
         },
         onSecondaryTapDown: (details) {
+          // Right click: select and show context menu
+          setState(() {
+            _selectedItem = filename;
+          });
           _showContextMenu(context, item, details.globalPosition);
         },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppTheme.primaryColor.withValues(alpha: 0.2)
+                : null,
+            border: isSelected
+                ? Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.5))
+                : null,
+            borderRadius: BorderRadius.circular(4),
+          ),
           child: Row(
             children: [
               Icon(
@@ -782,9 +809,10 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
                   children: [
                     Text(
                       filename,
-                      style: const TextStyle(
-                        color: AppTheme.textColor,
+                      style: TextStyle(
+                        color: isSelected ? AppTheme.primaryColor : AppTheme.textColor,
                         fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -800,6 +828,12 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
               ),
               PopupMenuButton(
                 icon: const Icon(Icons.more_vert, size: 18),
+                onOpened: () {
+                  // Select item when menu opens
+                  setState(() {
+                    _selectedItem = filename;
+                  });
+                },
                 itemBuilder: (context) => [
                   if (!isDir) ...[
                     const PopupMenuItem(
@@ -823,6 +857,17 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
                       ),
                     ),
                   ],
+                  if (isDir)
+                    const PopupMenuItem(
+                      value: 'open',
+                      child: Row(
+                        children: [
+                          Icon(Icons.folder_open, size: 18),
+                          SizedBox(width: 8),
+                          Text('Open'),
+                        ],
+                      ),
+                    ),
                   const PopupMenuItem(
                     value: 'rename',
                     child: Row(
@@ -845,7 +890,9 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
                   ),
                 ],
                 onSelected: (value) {
-                  if (value == 'download') {
+                  if (value == 'open') {
+                    _navigateTo(_getFullPath(filename));
+                  } else if (value == 'download') {
                     _downloadFile(filename);
                   } else if (value == 'download_as') {
                     _downloadFileAs(filename);
