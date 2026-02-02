@@ -22,7 +22,7 @@ class AppSettings {
     this.terminalOpacity = 1.0,
     this.showScrollbar = true,
     this.scrollbackLines = 10000,
-    this.terminalTheme = 'Default Dark',
+    this.terminalTheme = 'Monokai',
     this.sidebarCollapsed = false,
     this.terminalForegroundColor = 'Default',
   });
@@ -81,7 +81,7 @@ class AppSettings {
       terminalOpacity: (json['terminalOpacity'] as num?)?.toDouble() ?? 1.0,
       showScrollbar: json['showScrollbar'] as bool? ?? true,
       scrollbackLines: json['scrollbackLines'] as int? ?? 10000,
-      terminalTheme: json['terminalTheme'] as String? ?? 'Default Dark',
+      terminalTheme: json['terminalTheme'] as String? ?? 'Monokai',
       sidebarCollapsed: json['sidebarCollapsed'] as bool? ?? false,
       terminalForegroundColor: json['terminalForegroundColor'] as String? ?? 'Default',
     );
