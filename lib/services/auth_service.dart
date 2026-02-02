@@ -8,15 +8,21 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService extends ChangeNotifier {
-  // OAuth Client ID - Desktop apps use PKCE, client_secret can be empty
-  // Get your own Client ID from Google Cloud Console:
-  // 1. Create a new project or select existing
-  // 2. Enable Google Drive API
+  // OAuth credentials from Google Cloud Console
+  // Get your own credentials:
+  // 1. Go to https://console.cloud.google.com/
+  // 2. Create a project and enable Google Drive API
   // 3. Create OAuth 2.0 Client ID (Desktop app type)
-  // 4. Replace this with your Client ID
+  // 4. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables
+  //    or update the defaultValue below
   static const String _clientId = String.fromEnvironment(
     'GOOGLE_CLIENT_ID',
     defaultValue: '449803261214-6p5oc4no7cav8gh7kj4am1qg9elvk55u.apps.googleusercontent.com',
+  );
+
+  static const String _clientSecret = String.fromEnvironment(
+    'GOOGLE_CLIENT_SECRET',
+    defaultValue: '***REMOVED***',
   );
 
   static const List<String> _scopes = [
@@ -39,8 +45,8 @@ class AuthService extends ChangeNotifier {
   String? get userPhoto => _userPhoto;
   String? get userId => _userId;
 
-  // Desktop apps should use empty client_secret with PKCE
-  final _clientIdentifier = ClientId(_clientId, '');
+  // Client identifier with secret for OAuth
+  final _clientIdentifier = ClientId(_clientId, _clientSecret);
 
   Future<void> init() async {
     try {
