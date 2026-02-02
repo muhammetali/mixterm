@@ -1,5 +1,5 @@
 name: mixterm
-description: "Termius-like SSH/SFTP client for Linux and macOS"
+description: "Professional SSH/SFTP client for Linux, macOS and Windows"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -13,7 +13,7 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # SSH/SFTP
-  dartssh2: ^2.9.0
+  dartssh2: ^2.13.0
 
   # Terminal
   xterm: ^4.0.0
@@ -21,27 +21,27 @@ dependencies:
   # Google Auth & Drive
   googleapis: ^15.0.0
   googleapis_auth: ^2.0.0
-  http: ^1.2.0
+  http: ^1.6.0
 
   # Encryption
   encrypt: ^5.0.3
-  crypto: ^3.0.3
-  pointycastle: ^3.9.1
+  crypto: ^3.0.7
+  pointycastle: ^3.9.1  # Kept at 3.x for encrypt compatibility
 
   # State Management
-  provider: ^6.1.2
+  provider: ^6.1.5
 
   # Storage
-  shared_preferences: ^2.3.3
+  shared_preferences: ^2.5.4
   path_provider: ^2.1.5
 
   # Utils
-  uuid: ^4.5.1
+  uuid: ^4.5.2
   intl: ^0.20.2
-  file_picker: ^10.3.8
-  url_launcher: ^6.3.1
+  file_picker: ^10.3.10
+  url_launcher: ^6.3.2
   desktop_drop: ^0.7.0
-  cross_file: ^0.3.3+6
+  cross_file: ^0.3.5+2
 
 dev_dependencies:
   flutter_test:
