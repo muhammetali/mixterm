@@ -43,6 +43,7 @@ void main() {
     // Setup default behaviors
     when(() => mockSettingsProvider.fontSize).thenReturn(14);
     when(() => mockSettingsProvider.fontFamily).thenReturn('JetBrainsMono');
+    when(() => mockSettingsProvider.fontWeight).thenReturn('Normal');
     when(() => mockSettingsProvider.terminalTheme).thenReturn('Default Dark');
     when(() => mockSettingsProvider.terminalForegroundColor).thenReturn('Default');
     when(() => mockSettingsProvider.terminalOpacity).thenReturn(1.0);

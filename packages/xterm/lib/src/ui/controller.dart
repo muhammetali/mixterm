@@ -53,7 +53,20 @@ class TerminalController with ChangeNotifier {
   /// Set selection on the terminal from [base] to [extent]. This method takes
   /// the ownership of [base] and [extent] and will dispose them when the
   /// selection is cleared or changed.
+  ///
+  /// (MixTerm fork: Only notifies listeners if selection actually changed,
+  /// preventing unnecessary repaints during drag selection)
   void setSelection(CellAnchor base, CellAnchor extent, {SelectionMode? mode}) {
+    // Check if selection actually changed to prevent unnecessary repaints
+    final oldBaseOffset = _selectionBase?.offset;
+    final oldExtentOffset = _selectionExtent?.offset;
+    final newBaseOffset = base.offset;
+    final newExtentOffset = extent.offset;
+
+    final selectionChanged = oldBaseOffset != newBaseOffset ||
+        oldExtentOffset != newExtentOffset ||
+        (mode != null && mode != _selectionMode);
+
     _selectionBase?.dispose();
     _selectionBase = base;
 
@@ -64,7 +77,10 @@ class TerminalController with ChangeNotifier {
       _selectionMode = mode;
     }
 
-    notifyListeners();
+    // Only notify if selection actually changed
+    if (selectionChanged) {
+      notifyListeners();
+    }
   }
 
   BufferRange _createRange(CellOffset begin, CellOffset end) {

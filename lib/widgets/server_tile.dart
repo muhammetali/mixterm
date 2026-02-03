@@ -22,8 +22,9 @@ class ServerTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<ConnectionProvider>(
       builder: (context, connectionProvider, _) {
-        final isSSHConnected = connectionProvider.isSSHConnected(server.id);
-        final isSFTPConnected = connectionProvider.isSFTPConnected(server.id);
+        // Check if any tab has a connection to this server
+        final isSSHConnected = connectionProvider.hasAnySSHConnectionForServer(server.id);
+        final isSFTPConnected = connectionProvider.hasAnySFTPConnectionForServer(server.id);
         final isConnected = isSSHConnected || isSFTPConnected;
 
         if (isCollapsed) {
@@ -194,8 +195,8 @@ class ServerTile extends StatelessWidget {
               leading: const Icon(Icons.terminal),
               title: const Text('SSH Terminal'),
               subtitle: Text(
-                connectionProvider.isSSHConnected(server.id)
-                    ? 'Connected - Open new tab'
+                connectionProvider.hasAnySSHConnectionForServer(server.id)
+                    ? 'Open new tab (new connection)'
                     : 'Click to connect',
               ),
               onTap: () {
@@ -207,8 +208,8 @@ class ServerTile extends StatelessWidget {
               leading: const Icon(Icons.folder),
               title: const Text('SFTP File Browser'),
               subtitle: Text(
-                connectionProvider.isSFTPConnected(server.id)
-                    ? 'Connected - Open new tab'
+                connectionProvider.hasAnySFTPConnectionForServer(server.id)
+                    ? 'Open new tab (new connection)'
                     : 'Click to connect',
               ),
               onTap: () {
@@ -240,17 +241,12 @@ class ServerTile extends StatelessWidget {
       title: '${server.name} - SSH',
     );
 
-    if (connectionProvider.isSSHConnected(server.id)) {
-      // Already connected, just update tab connection status
-      tabProvider.updateTabConnection(tabId, true);
-      return;
-    }
-
     scaffoldMessenger.showSnackBar(
       const SnackBar(content: Text('Connecting...')),
     );
 
-    final result = await connectionProvider.connectSSH(server);
+    // Each tab gets its own independent connection
+    final result = await connectionProvider.connectSSH(server, tabId);
 
     if (!context.mounted) return;
     scaffoldMessenger.hideCurrentSnackBar();
@@ -288,17 +284,12 @@ class ServerTile extends StatelessWidget {
       title: '${server.name} - SFTP',
     );
 
-    if (connectionProvider.isSFTPConnected(server.id)) {
-      // Already connected, just update tab connection status
-      tabProvider.updateTabConnection(tabId, true);
-      return;
-    }
-
     scaffoldMessenger.showSnackBar(
       const SnackBar(content: Text('Connecting...')),
     );
 
-    final result = await connectionProvider.connectSFTP(server);
+    // Each tab gets its own independent connection
+    final result = await connectionProvider.connectSFTP(server, tabId);
 
     if (!context.mounted) return;
     scaffoldMessenger.hideCurrentSnackBar();
@@ -417,7 +408,7 @@ class ServerTile extends StatelessWidget {
             onPressed: () {
               final serverProvider = context.read<ServerProvider>();
               final connectionProvider = context.read<ConnectionProvider>();
-              connectionProvider.disconnectAll(server.id);
+              connectionProvider.disconnectAllForServer(server.id);
               serverProvider.deleteServer(server.id);
               Navigator.pop(dialogContext);
             },

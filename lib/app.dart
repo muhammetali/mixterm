@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/settings_provider.dart';
+import 'providers/connection_provider.dart';
+import 'providers/tab_provider.dart';
 import 'screens/home_screen.dart';
 import 'services/storage_service.dart';
 import 'services/auth_service.dart';
@@ -33,13 +35,42 @@ class AppWrapper extends StatefulWidget {
   State<AppWrapper> createState() => _AppWrapperState();
 }
 
-class _AppWrapperState extends State<AppWrapper> {
+class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
   bool _isLoading = true;
+  ConnectionProvider? _connectionProvider;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initApp();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Cache the provider reference for cleanup
+    _connectionProvider ??= context.read<ConnectionProvider>();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cleanupConnections();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      // App is being terminated
+      _cleanupConnections();
+    }
+  }
+
+  void _cleanupConnections() {
+    // Close all SSH/SFTP connections when app closes
+    _connectionProvider?.dispose();
   }
 
   Future<void> _initApp() async {

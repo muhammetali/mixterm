@@ -170,7 +170,9 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   }
 
   void _onControllerUpdate() {
-    markNeedsLayout();
+    // Selection and highlight changes only need repaint, not layout
+    // (MixTerm fork: prevents unnecessary layout recalculation during drag selection)
+    markNeedsPaint();
   }
 
   @override
@@ -297,6 +299,27 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         _terminal.buffer.createAnchorFromOffset(toPosition),
       );
     }
+  }
+
+  /// Selects characters with a stable cell offset for the start position.
+  /// This prevents selection drift when scrolling during drag.
+  /// (MixTerm fork: scroll-stable selection)
+  void selectCharactersFromCell(CellOffset fromCell, Offset to) {
+    var toPosition = getCellOffset(to);
+
+    // Determine if selection is forward or backward
+    final isForward = toPosition.y > fromCell.y ||
+        (toPosition.y == fromCell.y && toPosition.x >= fromCell.x);
+
+    // Adjust end position to include the cell under cursor
+    if (isForward) {
+      toPosition = CellOffset(toPosition.x + 1, toPosition.y);
+    }
+
+    _controller.setSelection(
+      _terminal.buffer.createAnchorFromOffset(fromCell),
+      _terminal.buffer.createAnchorFromOffset(toPosition),
+    );
   }
 
   /// Send a mouse event at [offset] with [button] being currently in [buttonState].

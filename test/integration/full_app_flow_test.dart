@@ -27,18 +27,18 @@ class MockAuthService extends Mock implements AuthService {}
 // Fake Providers
 class FakeConnectionProvider extends ConnectionProvider {
   final SSHService _mockSSHService;
-  
+
   FakeConnectionProvider(this._mockSSHService);
 
   @override
-  SSHService? getSSHConnection(String serverId) {
+  SSHService? getSSHConnection(String tabId) {
     return _mockSSHService;
   }
 
   @override
-  Future<ConnectionResult<SSHService>> connectSSH(Server server) async {
+  Future<ConnectionResult<SSHService>> connectSSH(Server server, String tabId) async {
     await Future.delayed(const Duration(milliseconds: 10));
-    notifyListeners(); 
+    notifyListeners();
     return ConnectionResult.ok(_mockSSHService);
   }
 }

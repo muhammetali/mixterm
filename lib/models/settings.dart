@@ -5,6 +5,7 @@ class AppSettings {
   final bool pasteOnRightClick;
   final int fontSize;
   final String fontFamily;
+  final String fontWeight; // 'normal', 'medium', 'bold'
   final ThemeMode themeMode;
   final double terminalOpacity;
   final bool showScrollbar;
@@ -18,6 +19,7 @@ class AppSettings {
     this.pasteOnRightClick = true,
     this.fontSize = 14,
     this.fontFamily = 'JetBrainsMono',
+    this.fontWeight = 'Normal',
     this.themeMode = ThemeMode.dark,
     this.terminalOpacity = 1.0,
     this.showScrollbar = true,
@@ -32,6 +34,7 @@ class AppSettings {
     bool? pasteOnRightClick,
     int? fontSize,
     String? fontFamily,
+    String? fontWeight,
     ThemeMode? themeMode,
     double? terminalOpacity,
     bool? showScrollbar,
@@ -45,6 +48,7 @@ class AppSettings {
       pasteOnRightClick: pasteOnRightClick ?? this.pasteOnRightClick,
       fontSize: fontSize ?? this.fontSize,
       fontFamily: fontFamily ?? this.fontFamily,
+      fontWeight: fontWeight ?? this.fontWeight,
       themeMode: themeMode ?? this.themeMode,
       terminalOpacity: terminalOpacity ?? this.terminalOpacity,
       showScrollbar: showScrollbar ?? this.showScrollbar,
@@ -61,6 +65,7 @@ class AppSettings {
       'pasteOnRightClick': pasteOnRightClick,
       'fontSize': fontSize,
       'fontFamily': fontFamily,
+      'fontWeight': fontWeight,
       'themeMode': themeMode.index,
       'terminalOpacity': terminalOpacity,
       'showScrollbar': showScrollbar,
@@ -77,6 +82,7 @@ class AppSettings {
       pasteOnRightClick: json['pasteOnRightClick'] as bool? ?? true,
       fontSize: json['fontSize'] as int? ?? 14,
       fontFamily: json['fontFamily'] as String? ?? 'JetBrainsMono',
+      fontWeight: json['fontWeight'] as String? ?? 'Normal',
       themeMode: ThemeMode.values[json['themeMode'] as int? ?? 2],
       terminalOpacity: (json['terminalOpacity'] as num?)?.toDouble() ?? 1.0,
       showScrollbar: json['showScrollbar'] as bool? ?? true,

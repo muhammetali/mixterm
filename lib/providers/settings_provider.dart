@@ -16,6 +16,7 @@ class SettingsProvider extends ChangeNotifier {
   bool get pasteOnRightClick => _settings.pasteOnRightClick;
   int get fontSize => _settings.fontSize;
   String get fontFamily => _settings.fontFamily;
+  String get fontWeight => _settings.fontWeight;
   ThemeMode get themeMode => _settings.themeMode;
   double get terminalOpacity => _settings.terminalOpacity;
   bool get showScrollbar => _settings.showScrollbar;
@@ -49,6 +50,10 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> setFontFamily(String value) async {
     await updateSettings(_settings.copyWith(fontFamily: value));
+  }
+
+  Future<void> setFontWeight(String value) async {
+    await updateSettings(_settings.copyWith(fontWeight: value));
   }
 
   Future<void> setThemeMode(ThemeMode value) async {

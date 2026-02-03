@@ -17,42 +17,62 @@ class ConnectionResult<T> {
       ConnectionResult(success: false, error: error);
 }
 
+/// Connection provider that manages SSH/SFTP connections per tab.
+/// Each tab has its own independent connection, allowing multiple
+/// sessions to the same server.
 class ConnectionProvider extends ChangeNotifier {
+  // Connections keyed by tabId for independent sessions per tab
   final Map<String, SSHService> _sshConnections = {};
   final Map<String, SFTPService> _sftpConnections = {};
-  final Set<String> _connectingServers = {};
-  String? _activeServerId;
+
+  // Track which server each tab is connected to (tabId -> serverId)
+  final Map<String, String> _tabServerMap = {};
+
+  // Race condition prevention for connections in progress
+  final Set<String> _connectingTabs = {};
+
+  String? _activeTabId;
   String? _activeConnectionType;
 
-  String? get activeServerId => _activeServerId;
+  String? get activeTabId => _activeTabId;
   String? get activeConnectionType => _activeConnectionType;
 
-  SSHService? getSSHConnection(String serverId) => _sshConnections[serverId];
-  SFTPService? getSFTPConnection(String serverId) => _sftpConnections[serverId];
+  /// Get SSH connection by tabId
+  SSHService? getSSHConnection(String tabId) => _sshConnections[tabId];
 
-  bool isSSHConnected(String serverId) =>
-      _sshConnections[serverId]?.isConnected ?? false;
+  /// Get SFTP connection by tabId
+  SFTPService? getSFTPConnection(String tabId) => _sftpConnections[tabId];
 
-  bool isSFTPConnected(String serverId) =>
-      _sftpConnections[serverId]?.isConnected ?? false;
+  /// Check if a tab has an active SSH connection
+  bool isSSHConnected(String tabId) =>
+      _sshConnections[tabId]?.isConnected ?? false;
 
-  Future<ConnectionResult<SSHService>> connectSSH(Server server) async {
+  /// Check if a tab has an active SFTP connection
+  bool isSFTPConnected(String tabId) =>
+      _sftpConnections[tabId]?.isConnected ?? false;
+
+  /// Get the serverId associated with a tab
+  String? getServerIdForTab(String tabId) => _tabServerMap[tabId];
+
+  /// Connect SSH for a specific tab - creates independent connection
+  Future<ConnectionResult<SSHService>> connectSSH(Server server, String tabId) async {
     // Race condition prevention
-    if (_connectingServers.contains(server.id)) {
+    if (_connectingTabs.contains(tabId)) {
       return ConnectionResult.fail('Connection already in progress');
     }
 
-    if (_sshConnections.containsKey(server.id)) {
-      final existing = _sshConnections[server.id]!;
+    // Check if this tab already has a connection
+    if (_sshConnections.containsKey(tabId)) {
+      final existing = _sshConnections[tabId]!;
       if (existing.isConnected) {
-        _activeServerId = server.id;
+        _activeTabId = tabId;
         _activeConnectionType = 'ssh';
         notifyListeners();
         return ConnectionResult.ok(existing);
       }
     }
 
-    _connectingServers.add(server.id);
+    _connectingTabs.add(tabId);
     notifyListeners();
 
     try {
@@ -60,8 +80,9 @@ class ConnectionProvider extends ChangeNotifier {
       final result = await sshService.connect(server);
 
       if (result.success) {
-        _sshConnections[server.id] = sshService;
-        _activeServerId = server.id;
+        _sshConnections[tabId] = sshService;
+        _tabServerMap[tabId] = server.id;
+        _activeTabId = tabId;
         _activeConnectionType = 'ssh';
         notifyListeners();
         return ConnectionResult.ok(sshService);
@@ -69,85 +90,140 @@ class ConnectionProvider extends ChangeNotifier {
 
       return ConnectionResult.fail(result.error ?? 'Connection failed');
     } finally {
-      _connectingServers.remove(server.id);
+      _connectingTabs.remove(tabId);
       notifyListeners();
     }
   }
 
-  Future<ConnectionResult<SFTPService>> connectSFTP(Server server) async {
-    if (_sftpConnections.containsKey(server.id)) {
-      final existing = _sftpConnections[server.id]!;
+  /// Connect SFTP for a specific tab - creates independent connection
+  Future<ConnectionResult<SFTPService>> connectSFTP(Server server, String tabId) async {
+    // Race condition prevention
+    if (_connectingTabs.contains(tabId)) {
+      return ConnectionResult.fail('Connection already in progress');
+    }
+
+    // Check if this tab already has a connection
+    if (_sftpConnections.containsKey(tabId)) {
+      final existing = _sftpConnections[tabId]!;
       if (existing.isConnected) {
-        _activeServerId = server.id;
+        _activeTabId = tabId;
         _activeConnectionType = 'sftp';
         notifyListeners();
         return ConnectionResult.ok(existing);
       }
     }
 
-    final sftpService = SFTPService();
-    final result = await sftpService.connect(server);
+    _connectingTabs.add(tabId);
+    notifyListeners();
 
-    if (result.success) {
-      _sftpConnections[server.id] = sftpService;
-      _activeServerId = server.id;
-      _activeConnectionType = 'sftp';
+    try {
+      final sftpService = SFTPService();
+      final result = await sftpService.connect(server);
+
+      if (result.success) {
+        _sftpConnections[tabId] = sftpService;
+        _tabServerMap[tabId] = server.id;
+        _activeTabId = tabId;
+        _activeConnectionType = 'sftp';
+        notifyListeners();
+        return ConnectionResult.ok(sftpService);
+      }
+
+      return ConnectionResult.fail(result.error ?? 'Connection failed');
+    } finally {
+      _connectingTabs.remove(tabId);
       notifyListeners();
-      return ConnectionResult.ok(sftpService);
     }
-
-    return ConnectionResult.fail(result.error ?? 'Connection failed');
   }
 
-  void setActive(String serverId, String type) {
-    _activeServerId = serverId;
+  void setActive(String tabId, String type) {
+    _activeTabId = tabId;
     _activeConnectionType = type;
     notifyListeners();
   }
 
-  Future<void> disconnectSSH(String serverId) async {
-    final service = _sshConnections[serverId];
+  /// Disconnect SSH connection for a specific tab
+  Future<void> disconnectSSH(String tabId) async {
+    final service = _sshConnections[tabId];
     if (service != null) {
       await service.disconnect();
-      _sshConnections.remove(serverId);
+      _sshConnections.remove(tabId);
+      _tabServerMap.remove(tabId);
 
-      if (_activeServerId == serverId && _activeConnectionType == 'ssh') {
-        _activeServerId = null;
+      if (_activeTabId == tabId && _activeConnectionType == 'ssh') {
+        _activeTabId = null;
         _activeConnectionType = null;
       }
       notifyListeners();
     }
   }
 
-  Future<void> disconnectSFTP(String serverId) async {
-    final service = _sftpConnections[serverId];
+  /// Disconnect SFTP connection for a specific tab
+  Future<void> disconnectSFTP(String tabId) async {
+    final service = _sftpConnections[tabId];
     if (service != null) {
       await service.disconnect();
-      _sftpConnections.remove(serverId);
+      _sftpConnections.remove(tabId);
+      _tabServerMap.remove(tabId);
 
-      if (_activeServerId == serverId && _activeConnectionType == 'sftp') {
-        _activeServerId = null;
+      if (_activeTabId == tabId && _activeConnectionType == 'sftp') {
+        _activeTabId = null;
         _activeConnectionType = null;
       }
       notifyListeners();
     }
   }
 
-  Future<void> disconnectAll(String serverId) async {
-    await disconnectSSH(serverId);
-    await disconnectSFTP(serverId);
+  /// Disconnect all connections for a specific tab
+  Future<void> disconnectTab(String tabId) async {
+    await disconnectSSH(tabId);
+    await disconnectSFTP(tabId);
   }
 
+  /// Get list of tabIds with active SSH connections
   List<String> get activeSSHConnections => _sshConnections.entries
       .where((e) => e.value.isConnected)
       .map((e) => e.key)
       .toList();
 
+  /// Get list of tabIds with active SFTP connections
   List<String> get activeSFTPConnections => _sftpConnections.entries
       .where((e) => e.value.isConnected)
       .map((e) => e.key)
       .toList();
 
+  /// Check if connection is in progress for a tab
+  bool isConnecting(String tabId) => _connectingTabs.contains(tabId);
+
+  /// Check if any SSH connection exists for a given server (across all tabs)
+  bool hasAnySSHConnectionForServer(String serverId) {
+    return _sshConnections.entries.any((e) =>
+      e.value.isConnected && _tabServerMap[e.key] == serverId
+    );
+  }
+
+  /// Check if any SFTP connection exists for a given server (across all tabs)
+  bool hasAnySFTPConnectionForServer(String serverId) {
+    return _sftpConnections.entries.any((e) =>
+      e.value.isConnected && _tabServerMap[e.key] == serverId
+    );
+  }
+
+  /// Disconnect all connections for a given server (all tabs connected to it)
+  Future<void> disconnectAllForServer(String serverId) async {
+    // Find all tabs connected to this server
+    final tabsToDisconnect = _tabServerMap.entries
+        .where((e) => e.value == serverId)
+        .map((e) => e.key)
+        .toList();
+
+    for (final tabId in tabsToDisconnect) {
+      await disconnectSSH(tabId);
+      await disconnectSFTP(tabId);
+    }
+  }
+
+  @override
   void dispose() {
     for (final service in _sshConnections.values) {
       service.dispose();

@@ -62,6 +62,12 @@ class SettingsScreen extends StatelessWidget {
                     (value) => settings.setFontFamily(value!),
                   ),
                   _buildDropdownTile<String>(
+                    'Font weight',
+                    settings.fontWeight,
+                    AppConstants.fontWeights,
+                    (value) => settings.setFontWeight(value!),
+                  ),
+                  _buildDropdownTile<String>(
                     'Terminal theme',
                     settings.terminalTheme,
                     AppTerminalThemes.themes.map((t) => t.name).toList(),

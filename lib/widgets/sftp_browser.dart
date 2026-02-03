@@ -52,7 +52,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
 
   void _checkConnectionAndLoad({ConnectionProvider? provider}) {
     final connectionProvider = provider ?? context.read<ConnectionProvider>();
-    final newService = connectionProvider.getSFTPConnection(widget.serverId);
+    final newService = connectionProvider.getSFTPConnection(widget.tabId);
 
     // Update service reference if changed
     if (newService != _sftpService) {
@@ -88,7 +88,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     try {
       final connectionProvider = context.read<ConnectionProvider>();
       final tabProvider = context.read<TabProvider>();
-      final sftpService = _sftpService ?? connectionProvider.getSFTPConnection(widget.serverId);
+      final sftpService = _sftpService ?? connectionProvider.getSFTPConnection(widget.tabId);
 
       if (sftpService == null || !sftpService.isConnected) {
         if (mounted) {
@@ -161,7 +161,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
   Future<void> _downloadFile(String filename, {String? localPath}) async {
     final connectionProvider = context.read<ConnectionProvider>();
     final transferProvider = context.read<TransferProvider>();
-    final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
+    final sftpService = connectionProvider.getSFTPConnection(widget.tabId);
 
     if (sftpService == null) return;
 
@@ -222,7 +222,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
   Future<void> _uploadFiles(List<String> filePaths) async {
     final connectionProvider = context.read<ConnectionProvider>();
     final transferProvider = context.read<TransferProvider>();
-    final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
+    final sftpService = connectionProvider.getSFTPConnection(widget.tabId);
 
     if (sftpService == null) return;
 
@@ -305,7 +305,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     if (name == null || name.isEmpty) return;
 
     final connectionProvider = context.read<ConnectionProvider>();
-    final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
+    final sftpService = connectionProvider.getSFTPConnection(widget.tabId);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     if (sftpService == null) return;
@@ -356,7 +356,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     if (newName == null || newName.isEmpty || newName == oldName) return;
 
     final connectionProvider = context.read<ConnectionProvider>();
-    final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
+    final sftpService = connectionProvider.getSFTPConnection(widget.tabId);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     if (sftpService == null) return;
@@ -405,7 +405,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     if (confirmed != true) return;
 
     final connectionProvider = context.read<ConnectionProvider>();
-    final sftpService = connectionProvider.getSFTPConnection(widget.serverId);
+    final sftpService = connectionProvider.getSFTPConnection(widget.tabId);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     if (sftpService == null) return;
@@ -576,7 +576,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
             onPressed: () {
               final connectionProvider = context.read<ConnectionProvider>();
               final tabProvider = context.read<TabProvider>();
-              connectionProvider.disconnectSFTP(widget.serverId);
+              connectionProvider.disconnectSFTP(widget.tabId);
               tabProvider.removeTab(widget.tabId);
             },
           ),

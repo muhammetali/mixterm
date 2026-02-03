@@ -319,6 +319,12 @@ class TerminalPainter {
       effectiveBg = bgType == CellColor.normal ? themeBg : resolveBackgroundColor(cellData.background);
     }
 
+    // Handle transparent background - use black as fallback for dark terminals
+    // This ensures text remains visible when colors are swapped
+    if (effectiveBg.a == 0 || effectiveBg == const Color(0x00000000)) {
+      effectiveBg = const Color(0xFF000000); // Solid black fallback
+    }
+
     // For selection: swap fg and bg (terminal-style invert)
     // Selected cell: bg becomes fg color, fg becomes bg color
     final selectionBg = effectiveFg;

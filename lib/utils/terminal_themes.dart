@@ -17,7 +17,17 @@ class NamedForegroundColor {
 }
 
 class AppTerminalThemes {
+  /// Special theme name that follows system dark/light mode
+  static const String systemThemeName = 'System';
+
+  /// Theme used when system is in dark mode
+  static const String systemDarkTheme = 'Monokai';
+
+  /// Theme used when system is in light mode
+  static const String systemLightTheme = 'GitHub Light';
+
   static final List<NamedTerminalTheme> themes = [
+    NamedTerminalTheme('System', _monokai), // Placeholder, actual theme resolved at runtime
     NamedTerminalTheme('Default Dark', _defaultDark),
     NamedTerminalTheme('Dracula', _dracula),
     NamedTerminalTheme('Solarized Dark', _solarizedDark),
@@ -37,9 +47,22 @@ class AppTerminalThemes {
     const NamedForegroundColor('Lime', Color(0xFFBFFF00)),
   ];
 
-  static TerminalTheme getTheme(String name, {String? foregroundColorName}) {
+  /// Gets the terminal theme by name.
+  /// If [name] is 'System', uses [platformBrightness] to select dark/light theme.
+  static TerminalTheme getTheme(
+    String name, {
+    String? foregroundColorName,
+    Brightness? platformBrightness,
+  }) {
+    // Handle System theme - select based on platform brightness
+    String effectiveName = name;
+    if (name == systemThemeName) {
+      final isDark = platformBrightness != Brightness.light;
+      effectiveName = isDark ? systemDarkTheme : systemLightTheme;
+    }
+
     final baseTheme = themes.firstWhere(
-      (t) => t.name == name,
+      (t) => t.name == effectiveName,
       orElse: () => themes.first,
     ).theme;
 

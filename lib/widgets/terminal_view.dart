@@ -53,13 +53,13 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
   Timer? _autoScrollTimer;
   bool _isDragging = false;
   Offset? _lastPointerPosition; // Local position for edge detection
-  Offset? _lastGlobalPosition;  // Global position for coordinate conversion
-  CellOffset? _dragStartCellOffset; // Store drag start in BUFFER coordinates
+  CellOffset? _dragStartCellOffset; // Start position in BUFFER coordinates (stable across scroll)
+  Offset? _lastTerminalLocal;       // Current position in TerminalView local coordinates
   final GlobalKey _terminalKey = GlobalKey();
   final GlobalKey<TerminalViewState> _xtermViewKey = GlobalKey<TerminalViewState>();
 
-  // Debug logging
-  static const bool _debugSelection = true;
+  // Debug logging - set to false for production
+  static const bool _debugSelection = false;
   void _logSelection(String message) {
     if (_debugSelection) {
       debugPrint('[Selection] $message');
@@ -231,15 +231,83 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
     }
   }
 
+  /// Get platform-specific monospace font fallback chain
+  /// This provides robust font selection across different platforms
+  /// Based on ChatGPT recommendation for stable terminal font rendering
+  List<String> _getSystemMonospaceFallback() {
+    final platform = Theme.of(context).platform;
+
+    if (platform == TargetPlatform.macOS || platform == TargetPlatform.iOS) {
+      return [
+        'SF Mono',
+        'Menlo',
+        'Monaco',
+        'SourceCodePro', // Our bundled fallback
+        'Courier New',
+        'monospace',
+      ];
+    } else if (platform == TargetPlatform.windows) {
+      return [
+        'Cascadia Mono',
+        'CascadiaMono', // Our bundled version
+        'Consolas',
+        'Courier New',
+        'monospace',
+      ];
+    } else if (platform == TargetPlatform.android) {
+      return [
+        'RobotoMono',
+        'Roboto Mono',
+        'Noto Sans Mono',
+        'Droid Sans Mono',
+        'monospace',
+      ];
+    } else {
+      // Linux
+      return [
+        'UbuntuSansMono', // Our bundled Ubuntu Sans Mono
+        'Ubuntu Sans Mono',
+        'DejaVu Sans Mono',
+        'UbuntuMono', // Our bundled Ubuntu Mono
+        'Ubuntu Mono',
+        'Noto Sans Mono',
+        'Liberation Mono',
+        'monospace',
+      ];
+    }
+  }
+
+  /// Convert font weight string to Flutter FontWeight
+  FontWeight _getFontWeight(String weightName) {
+    switch (weightName.toLowerCase()) {
+      case 'extra light':
+        return FontWeight.w200;
+      case 'light':
+        return FontWeight.w300;
+      case 'normal':
+        return FontWeight.normal;
+      case 'medium':
+        return FontWeight.w500;
+      case 'bold':
+        return FontWeight.bold;
+      default:
+        return FontWeight.normal;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Use select() to only rebuild when specific settings change
     final fontSize = context.select<SettingsProvider, int>((s) => s.fontSize);
     final fontFamily = context.select<SettingsProvider, String>((s) => s.fontFamily);
+    final fontWeightName = context.select<SettingsProvider, String>((s) => s.fontWeight);
     final terminalOpacity = context.select<SettingsProvider, double>((s) => s.terminalOpacity);
     final pasteOnRightClick = context.select<SettingsProvider, bool>((s) => s.pasteOnRightClick);
     final terminalTheme = context.select<SettingsProvider, String>((s) => s.terminalTheme);
     final terminalForegroundColor = context.select<SettingsProvider, String>((s) => s.terminalForegroundColor);
+
+    // Get platform brightness for System theme
+    final platformBrightness = MediaQuery.platformBrightnessOf(context);
 
     final serverProvider = context.read<ServerProvider>();
     final server = serverProvider.getServer(widget.serverId);
@@ -248,10 +316,24 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    // Get theme with platform brightness for System theme support
     final theme = AppTerminalThemes.getTheme(
       terminalTheme,
       foregroundColorName: terminalForegroundColor,
+      platformBrightness: platformBrightness,
     );
+
+    final fontWeight = _getFontWeight(fontWeightName);
+
+    // Resolve font family and fallback chain
+    // For "System": use platform-specific fallback chain for robust font selection
+    final isSystemFont = fontFamily == 'System';
+    final systemFallback = _getSystemMonospaceFallback();
+    final effectiveFontFamily = isSystemFont ? systemFallback.first : fontFamily;
+    // Use platform fallback for System, or standard monospace fallback for custom fonts
+    final fallbackChain = isSystemFont
+        ? systemFallback
+        : const ['monospace', 'Courier New'];
 
     return Column(
       children: [
@@ -281,7 +363,9 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
                       alwaysShowCursor: true,
                       textStyle: TerminalStyle(
                         fontSize: fontSize.toDouble(),
-                        fontFamily: fontFamily,
+                        fontFamily: effectiveFontFamily,
+                        fontFamilyFallback: fallbackChain,
+                        fontWeight: fontWeight,
                       ),
                       onSecondaryTapDown: (details, offset) {
                         if (pasteOnRightClick) {
@@ -564,31 +648,34 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
     // Only track left mouse button for selection
     if (event.buttons == kPrimaryButton) {
       _isDragging = true;
-      // Store global position for consistent coordinate conversion
-      _lastGlobalPosition = event.position;
-      _lastPointerPosition = event.localPosition; // Keep for auto-scroll edge detection
+      _lastPointerPosition = event.localPosition; // For auto-scroll edge detection
 
-      // Store drag start position in BUFFER coordinates
-      try {
-        final terminalViewState = _xtermViewKey.currentState;
-        if (terminalViewState != null) {
+      // Convert to terminal local coordinates
+      final terminalLocal = _globalToTerminalLocal(event.position);
+      final terminalViewState = _xtermViewKey.currentState;
+
+      if (terminalLocal != null && terminalViewState != null) {
+        _lastTerminalLocal = terminalLocal;
+
+        // IMPORTANT: Store start position as CELL coordinates, not pixel coordinates
+        // This ensures the selection start point remains stable when scrolling
+        // (same pixel position maps to different cells after scroll change)
+        try {
           final renderTerminal = terminalViewState.renderTerminal;
-
-          // Use global position directly - most robust approach
-          final terminalLocal = _globalToTerminalLocal(event.position);
-          if (terminalLocal != null) {
-            _dragStartCellOffset = renderTerminal.getCellOffset(terminalLocal);
-            _logSelection(
-              'Drag START: global=(${event.position.dx.toStringAsFixed(1)},${event.position.dy.toStringAsFixed(1)}) '
-              'terminalLocal=(${terminalLocal.dx.toStringAsFixed(1)},${terminalLocal.dy.toStringAsFixed(1)}) '
-              'cell=$_dragStartCellOffset'
-            );
-          } else {
-            _logSelection('Failed to convert global position to terminal local');
-          }
+          _dragStartCellOffset = renderTerminal.getCellOffset(terminalLocal);
+          _logSelection(
+            'Drag START: global=(${event.position.dx.toStringAsFixed(1)},${event.position.dy.toStringAsFixed(1)}) '
+            'terminalLocal=(${terminalLocal.dx.toStringAsFixed(1)},${terminalLocal.dy.toStringAsFixed(1)}) '
+            'cell=(${_dragStartCellOffset!.x},${_dragStartCellOffset!.y})'
+          );
+        } catch (e) {
+          _logSelection('Failed to get cell offset: $e');
+          // Reset state on failure to prevent partial state
+          _dragStartCellOffset = null;
+          _lastTerminalLocal = null;
         }
-      } catch (e) {
-        _logSelection('Error getting start cell offset: $e');
+      } else {
+        _logSelection('Failed to convert global position to terminal local');
       }
     }
   }
@@ -597,7 +684,13 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
     if (!_isDragging) return;
 
     _lastPointerPosition = event.localPosition; // For edge detection
-    _lastGlobalPosition = event.position;       // For coordinate conversion
+
+    // Update current terminal local position
+    final terminalLocal = _globalToTerminalLocal(event.position);
+    if (terminalLocal != null) {
+      _lastTerminalLocal = terminalLocal;
+    }
+
     _checkAndStartAutoScroll();
   }
 
@@ -605,8 +698,8 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
     _logSelection('Drag END');
     _isDragging = false;
     _lastPointerPosition = null;
-    _lastGlobalPosition = null;
     _dragStartCellOffset = null;
+    _lastTerminalLocal = null;
     _stopAutoScroll();
   }
 
@@ -671,7 +764,10 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
   }
 
   void _doUpdateSelection() {
-    if (_dragStartCellOffset == null || _lastGlobalPosition == null) return;
+    // Null safety checks
+    if (_dragStartCellOffset == null || _lastTerminalLocal == null) {
+      return;
+    }
 
     try {
       final terminalViewState = _xtermViewKey.currentState;
@@ -681,28 +777,20 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
       }
 
       final renderTerminal = terminalViewState.renderTerminal;
+      final viewportSize = renderTerminal.size;
 
-      // Use global position directly - most robust approach
-      final terminalLocal = _globalToTerminalLocal(_lastGlobalPosition!);
-      if (terminalLocal == null) {
-        _logSelection('Failed to convert global position to terminal local');
-        return;
-      }
-
-      // Get current mouse position in BUFFER coordinates
-      final currentCellOffset = renderTerminal.getCellOffset(terminalLocal);
+      // Clamp current position to viewport bounds
+      final clampedX = _lastTerminalLocal!.dx.clamp(0.0, viewportSize.width);
+      final clampedY = _lastTerminalLocal!.dy.clamp(0.0, viewportSize.height);
+      final currentTerminalLocal = Offset(clampedX, clampedY);
 
       _logSelection(
-        'Selection update: from=$_dragStartCellOffset to=$currentCellOffset '
-        'terminalLocal=(${terminalLocal.dx.toStringAsFixed(1)},${terminalLocal.dy.toStringAsFixed(1)})'
+        'Auto-scroll selection update: startCell=(${_dragStartCellOffset!.x},${_dragStartCellOffset!.y}) '
+        'endPixel=(${currentTerminalLocal.dx.toStringAsFixed(1)},${currentTerminalLocal.dy.toStringAsFixed(1)})'
       );
 
-      // Create anchors from buffer offsets and set selection
-      final buffer = _terminal!.buffer;
-      final baseAnchor = buffer.createAnchorFromOffset(_dragStartCellOffset!);
-      final extentAnchor = buffer.createAnchorFromOffset(currentCellOffset);
-
-      _terminalController?.setSelection(baseAnchor, extentAnchor);
+      // Delegate to xterm's scroll-stable selection method (MixTerm fork)
+      renderTerminal.selectCharactersFromCell(_dragStartCellOffset!, currentTerminalLocal);
     } catch (e, stack) {
       _logSelection('Error updating selection: $e\n$stack');
     }

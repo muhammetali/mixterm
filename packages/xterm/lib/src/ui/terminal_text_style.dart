@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 const _kDefaultFontSize = 13.0;
@@ -29,6 +30,7 @@ class TerminalStyle {
     this.height = _kDefaultHeight,
     this.fontFamily = _kDefaultFontFamily,
     this.fontFamilyFallback = _kDefaultFontFamilyFallback,
+    this.fontWeight = FontWeight.normal,
   });
 
   factory TerminalStyle.fromTextStyle(TextStyle textStyle) {
@@ -40,6 +42,7 @@ class TerminalStyle {
           _kDefaultFontFamily,
       fontFamilyFallback:
           textStyle.fontFamilyFallback ?? _kDefaultFontFamilyFallback,
+      fontWeight: textStyle.fontWeight ?? FontWeight.normal,
     );
   }
 
@@ -51,6 +54,10 @@ class TerminalStyle {
 
   final List<String> fontFamilyFallback;
 
+  /// Base font weight for terminal text. Individual characters may still
+  /// use bold when the terminal requests it.
+  final FontWeight fontWeight;
+
   TextStyle toTextStyle({
     Color? color,
     Color? backgroundColor,
@@ -58,6 +65,9 @@ class TerminalStyle {
     bool italic = false,
     bool underline = false,
   }) {
+    // Use base fontWeight, but override to bold if terminal requests it
+    final effectiveWeight = bold ? FontWeight.bold : fontWeight;
+
     return TextStyle(
       fontSize: fontSize,
       height: height,
@@ -65,7 +75,7 @@ class TerminalStyle {
       fontFamilyFallback: fontFamilyFallback,
       color: color,
       backgroundColor: backgroundColor,
-      fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+      fontWeight: effectiveWeight,
       fontStyle: italic ? FontStyle.italic : FontStyle.normal,
       decoration: underline ? TextDecoration.underline : TextDecoration.none,
     );
@@ -76,12 +86,34 @@ class TerminalStyle {
     double? height,
     String? fontFamily,
     List<String>? fontFamilyFallback,
+    FontWeight? fontWeight,
   }) {
     return TerminalStyle(
       fontSize: fontSize ?? this.fontSize,
       height: height ?? this.height,
       fontFamily: fontFamily ?? this.fontFamily,
       fontFamilyFallback: fontFamilyFallback ?? this.fontFamilyFallback,
+      fontWeight: fontWeight ?? this.fontWeight,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is TerminalStyle &&
+        other.fontSize == fontSize &&
+        other.height == height &&
+        other.fontFamily == fontFamily &&
+        listEquals(other.fontFamilyFallback, fontFamilyFallback) &&
+        other.fontWeight == fontWeight;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        fontSize,
+        height,
+        fontFamily,
+        Object.hashAll(fontFamilyFallback),
+        fontWeight,
+      );
 }

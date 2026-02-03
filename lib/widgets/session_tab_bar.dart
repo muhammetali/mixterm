@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/tab_session.dart';
 import '../providers/tab_provider.dart';
+import '../providers/connection_provider.dart';
+import '../providers/server_provider.dart';
 import '../utils/theme.dart';
 
 class SessionTabBar extends StatelessWidget {
@@ -37,6 +39,40 @@ class SessionTabBar extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final tab = tabProvider.tabs[index];
                     final isActive = tab.id == tabProvider.activeTabId;
+                    final connectionProvider = context.read<ConnectionProvider>();
+
+                    void closeTab() {
+                      // Disconnect this tab's specific connection (keyed by tabId)
+                      if (tab.type == TabType.ssh) {
+                        connectionProvider.disconnectSSH(tab.id);
+                      } else {
+                        connectionProvider.disconnectSFTP(tab.id);
+                      }
+                      tabProvider.removeTab(tab.id);
+                    }
+
+                    Future<void> duplicateTab() async {
+                      if (tab.serverId != null) {
+                        final serverProvider = context.read<ServerProvider>();
+                        final server = serverProvider.getServer(tab.serverId!);
+                        if (server == null) return;
+
+                        // Create a new tab with the same server and type
+                        final newTabId = tabProvider.addTab(
+                          type: tab.type,
+                          serverId: tab.serverId,
+                          title: '${tab.title} (copy)',
+                        );
+                        tabProvider.setActiveTab(newTabId);
+
+                        // Start a new independent connection for the new tab
+                        if (tab.type == TabType.ssh) {
+                          await connectionProvider.connectSSH(server, newTabId);
+                        } else {
+                          await connectionProvider.connectSFTP(server, newTabId);
+                        }
+                      }
+                    }
 
                     return ReorderableDragStartListener(
                       key: ValueKey(tab.id),
@@ -45,8 +81,9 @@ class SessionTabBar extends StatelessWidget {
                         tab: tab,
                         isActive: isActive,
                         onTap: () => tabProvider.setActiveTab(tab.id),
-                        onClose: () => tabProvider.removeTab(tab.id),
-                        onMiddleClick: () => tabProvider.removeTab(tab.id),
+                        onClose: closeTab,
+                        onMiddleClick: closeTab,
+                        onDuplicate: tab.serverId != null ? duplicateTab : null,
                       ),
                     );
                   },
@@ -72,6 +109,7 @@ class _TabItem extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onClose;
   final VoidCallback onMiddleClick;
+  final VoidCallback? onDuplicate;
 
   const _TabItem({
     required this.tab,
@@ -79,6 +117,7 @@ class _TabItem extends StatelessWidget {
     required this.onTap,
     required this.onClose,
     required this.onMiddleClick,
+    this.onDuplicate,
   });
 
   @override
@@ -92,6 +131,9 @@ class _TabItem extends StatelessWidget {
       },
       child: GestureDetector(
         onTap: onTap,
+        onSecondaryTapDown: (details) {
+          _showContextMenu(context, details.globalPosition);
+        },
         child: Container(
           constraints: const BoxConstraints(
             minWidth: 120,
@@ -157,5 +199,46 @@ class _TabItem extends StatelessWidget {
       case TabType.sftp:
         return Icons.folder;
     }
+  }
+
+  void _showContextMenu(BuildContext context, Offset position) {
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx,
+        position.dy,
+      ),
+      items: <PopupMenuEntry<String>>[
+        if (onDuplicate != null)
+          const PopupMenuItem<String>(
+            value: 'duplicate',
+            child: Row(
+              children: [
+                Icon(Icons.copy, size: 18),
+                SizedBox(width: 8),
+                Text('Duplicate'),
+              ],
+            ),
+          ),
+        const PopupMenuItem<String>(
+          value: 'close',
+          child: Row(
+            children: [
+              Icon(Icons.close, size: 18),
+              SizedBox(width: 8),
+              Text('Close'),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'duplicate' && onDuplicate != null) {
+        onDuplicate!();
+      } else if (value == 'close') {
+        onClose();
+      }
+    });
   }
 }

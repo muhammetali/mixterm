@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
+import 'package:xterm/src/core/buffer/cell_offset.dart';
 import 'package:xterm/src/core/mouse/button.dart';
 import 'package:xterm/src/core/mouse/button_state.dart';
 import 'package:xterm/src/terminal_view.dart';
@@ -55,7 +56,10 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
 
   RenderTerminal get renderTerminal => terminalView.renderTerminal;
 
-  DragStartDetails? _lastDragStartDetails;
+  /// Stores the drag start position as CELL coordinates (not pixels).
+  /// This ensures selection start remains stable when scrolling.
+  /// (MixTerm fork: scroll-stable selection)
+  CellOffset? _dragStartCellOffset;
 
   LongPressStartDetails? _lastLongPressStartDetails;
 
@@ -175,7 +179,9 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
   // void onLongPressUp() {}
 
   void onDragStart(DragStartDetails details) {
-    _lastDragStartDetails = details;
+    // Store start position as CELL coordinates for scroll-stable selection
+    // (MixTerm fork: fixes selection drift during auto-scroll)
+    _dragStartCellOffset = renderTerminal.getCellOffset(details.localPosition);
 
     details.kind == PointerDeviceKind.mouse
         ? renderTerminal.selectCharacters(details.localPosition)
@@ -183,9 +189,13 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
   }
 
   void onDragUpdate(DragUpdateDetails details) {
-    renderTerminal.selectCharacters(
-      _lastDragStartDetails!.localPosition,
-      details.localPosition,
-    );
+    // Use stable cell offset for start position to prevent drift during scroll
+    // (MixTerm fork: scroll-stable selection)
+    if (_dragStartCellOffset != null) {
+      renderTerminal.selectCharactersFromCell(
+        _dragStartCellOffset!,
+        details.localPosition,
+      );
+    }
   }
 }
