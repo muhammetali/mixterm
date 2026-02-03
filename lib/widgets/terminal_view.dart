@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -42,10 +43,28 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
   String _statusMessage = 'Initializing...';
   String? _errorMessage;
   bool _isInitialized = false;
-  
+
   // Stream subscriptions to prevent memory leaks and race conditions
   StreamSubscription<SSHConnectionState>? _connectionSubscription;
   StreamSubscription<String>? _outputSubscription;
+
+  // Auto-scroll during selection
+  final ScrollController _scrollController = ScrollController();
+  Timer? _autoScrollTimer;
+  bool _isDragging = false;
+  Offset? _lastPointerPosition; // Local position for edge detection
+  Offset? _lastGlobalPosition;  // Global position for coordinate conversion
+  CellOffset? _dragStartCellOffset; // Store drag start in BUFFER coordinates
+  final GlobalKey _terminalKey = GlobalKey();
+  final GlobalKey<TerminalViewState> _xtermViewKey = GlobalKey<TerminalViewState>();
+
+  // Debug logging
+  static const bool _debugSelection = true;
+  void _logSelection(String message) {
+    if (_debugSelection) {
+      debugPrint('[Selection] $message');
+    }
+  }
 
   @override
   void initState() {
@@ -57,6 +76,8 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
   void dispose() {
     _terminalController?.removeListener(_handleSelectionChange);
     _cancelSubscriptions();
+    _stopAutoScroll();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -116,7 +137,7 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
 
   void _checkConnectionState({ConnectionProvider? provider}) {
     final connectionProvider = provider ?? context.read<ConnectionProvider>();
-    final newService = connectionProvider.getSSHConnection(widget.serverId);
+    final newService = connectionProvider.getSSHConnection(widget.tabId);
 
     // If service changed or we are not initialized yet
     if (newService != _sshService) {
@@ -241,24 +262,33 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
               KeyboardListener(
                 focusNode: FocusNode(),
                 onKeyEvent: _handleKeyEvent,
-                child: Container(
-                  color: AppTheme.terminalBackground.withValues(alpha: terminalOpacity),
-                  padding: const EdgeInsets.all(8), // Terminal padding
-                  child: TerminalView(
-                    _terminal!,
-                    controller: _terminalController,
-                    theme: theme,
-                    autofocus: true,
-                    alwaysShowCursor: true,
-                    textStyle: TerminalStyle(
-                      fontSize: fontSize.toDouble(),
-                      fontFamily: fontFamily,
+                child: Listener(
+                  onPointerDown: _onPointerDown,
+                  onPointerMove: _onPointerMove,
+                  onPointerUp: _onPointerUp,
+                  onPointerCancel: _onPointerUp,
+                  child: Container(
+                    key: _terminalKey,
+                    color: AppTheme.terminalBackground.withValues(alpha: terminalOpacity),
+                    padding: const EdgeInsets.all(8), // Terminal padding
+                    child: TerminalView(
+                      _terminal!,
+                      key: _xtermViewKey,
+                      controller: _terminalController,
+                      scrollController: _scrollController,
+                      theme: theme,
+                      autofocus: true,
+                      alwaysShowCursor: true,
+                      textStyle: TerminalStyle(
+                        fontSize: fontSize.toDouble(),
+                        fontFamily: fontFamily,
+                      ),
+                      onSecondaryTapDown: (details, offset) {
+                        if (pasteOnRightClick) {
+                          _pasteFromClipboard();
+                        }
+                      },
                     ),
-                    onSecondaryTapDown: (details, offset) {
-                      if (pasteOnRightClick) {
-                        _pasteFromClipboard();
-                      }
-                    },
                   ),
                 ),
               ),
@@ -317,7 +347,7 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
             icon: const Icon(Icons.close, size: 18),
             tooltip: 'Disconnect',
             onPressed: () {
-              context.read<ConnectionProvider>().disconnectSSH(widget.serverId);
+              context.read<ConnectionProvider>().disconnectSSH(widget.tabId);
               context.read<TabProvider>().removeTab(widget.tabId);
             },
           ),
@@ -461,10 +491,10 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
       _statusMessage = 'Reconnecting...';
       _errorMessage = null;
     });
-    
+
     final server = context.read<ServerProvider>().getServer(widget.serverId);
     if (server != null) {
-      final result = await context.read<ConnectionProvider>().connectSSH(server);
+      final result = await context.read<ConnectionProvider>().connectSSH(server, widget.tabId);
       if (!result.success && mounted) {
         setState(() {
           _connectionStatus = ConnectionStatus.error;
@@ -508,5 +538,178 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
         _pasteFromClipboard();
       }
     }
+  }
+
+  /// Convert a global position directly to TerminalView's local coordinate system.
+  /// This is the most robust approach as it bypasses any intermediate coordinate systems
+  /// (Listener, Container padding, Stack overlays, etc.)
+  ///
+  /// IMPORTANT: Always use event.position (global) not event.localPosition
+  Offset? _globalToTerminalLocal(Offset globalPosition) {
+    try {
+      final terminalViewState = _xtermViewKey.currentState;
+      if (terminalViewState == null) return null;
+
+      // Direct conversion: global → TerminalView local
+      final terminalRenderBox = terminalViewState.renderTerminal;
+      return terminalRenderBox.globalToLocal(globalPosition);
+    } catch (e) {
+      _logSelection('Error converting position: $e');
+      return null;
+    }
+  }
+
+  // Auto-scroll during text selection
+  void _onPointerDown(PointerDownEvent event) {
+    // Only track left mouse button for selection
+    if (event.buttons == kPrimaryButton) {
+      _isDragging = true;
+      // Store global position for consistent coordinate conversion
+      _lastGlobalPosition = event.position;
+      _lastPointerPosition = event.localPosition; // Keep for auto-scroll edge detection
+
+      // Store drag start position in BUFFER coordinates
+      try {
+        final terminalViewState = _xtermViewKey.currentState;
+        if (terminalViewState != null) {
+          final renderTerminal = terminalViewState.renderTerminal;
+
+          // Use global position directly - most robust approach
+          final terminalLocal = _globalToTerminalLocal(event.position);
+          if (terminalLocal != null) {
+            _dragStartCellOffset = renderTerminal.getCellOffset(terminalLocal);
+            _logSelection(
+              'Drag START: global=(${event.position.dx.toStringAsFixed(1)},${event.position.dy.toStringAsFixed(1)}) '
+              'terminalLocal=(${terminalLocal.dx.toStringAsFixed(1)},${terminalLocal.dy.toStringAsFixed(1)}) '
+              'cell=$_dragStartCellOffset'
+            );
+          } else {
+            _logSelection('Failed to convert global position to terminal local');
+          }
+        }
+      } catch (e) {
+        _logSelection('Error getting start cell offset: $e');
+      }
+    }
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (!_isDragging) return;
+
+    _lastPointerPosition = event.localPosition; // For edge detection
+    _lastGlobalPosition = event.position;       // For coordinate conversion
+    _checkAndStartAutoScroll();
+  }
+
+  void _onPointerUp(PointerEvent event) {
+    _logSelection('Drag END');
+    _isDragging = false;
+    _lastPointerPosition = null;
+    _lastGlobalPosition = null;
+    _dragStartCellOffset = null;
+    _stopAutoScroll();
+  }
+
+  void _checkAndStartAutoScroll() {
+    if (!_isDragging || _lastPointerPosition == null) {
+      _stopAutoScroll();
+      return;
+    }
+
+    final renderBox = _terminalKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final height = renderBox.size.height;
+    final y = _lastPointerPosition!.dy;
+
+    // Edge zones for auto-scroll (top and bottom 50 pixels)
+    const edgeZone = 50.0;
+    const scrollSpeed = 5.0;
+
+    if (y < edgeZone) {
+      // Near top - scroll up
+      final intensity = (edgeZone - y) / edgeZone;
+      _startAutoScroll(-scrollSpeed * intensity);
+    } else if (y > height - edgeZone) {
+      // Near bottom - scroll down
+      final intensity = (y - (height - edgeZone)) / edgeZone;
+      _startAutoScroll(scrollSpeed * intensity);
+    } else {
+      _stopAutoScroll();
+    }
+  }
+
+  void _startAutoScroll(double delta) {
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+      if (!mounted || !_scrollController.hasClients) {
+        _stopAutoScroll();
+        return;
+      }
+
+      final currentOffset = _scrollController.offset;
+      final maxOffset = _scrollController.position.maxScrollExtent;
+      final minOffset = _scrollController.position.minScrollExtent;
+
+      // Scale delta for slower timer
+      final scaledDelta = delta * 3;
+      final newOffset = (currentOffset + scaledDelta).clamp(minOffset, maxOffset);
+      final actualDelta = newOffset - currentOffset;
+
+      if (actualDelta != 0) {
+        _scrollController.jumpTo(newOffset);
+        _logSelection('Scroll: offset=$newOffset, delta=$actualDelta');
+
+        // Update selection after a short delay to let xterm process first
+        Future.delayed(const Duration(milliseconds: 10), () {
+          if (mounted && _isDragging) {
+            _doUpdateSelection();
+          }
+        });
+      }
+    });
+  }
+
+  void _doUpdateSelection() {
+    if (_dragStartCellOffset == null || _lastGlobalPosition == null) return;
+
+    try {
+      final terminalViewState = _xtermViewKey.currentState;
+      if (terminalViewState == null) {
+        _logSelection('TerminalViewState is null');
+        return;
+      }
+
+      final renderTerminal = terminalViewState.renderTerminal;
+
+      // Use global position directly - most robust approach
+      final terminalLocal = _globalToTerminalLocal(_lastGlobalPosition!);
+      if (terminalLocal == null) {
+        _logSelection('Failed to convert global position to terminal local');
+        return;
+      }
+
+      // Get current mouse position in BUFFER coordinates
+      final currentCellOffset = renderTerminal.getCellOffset(terminalLocal);
+
+      _logSelection(
+        'Selection update: from=$_dragStartCellOffset to=$currentCellOffset '
+        'terminalLocal=(${terminalLocal.dx.toStringAsFixed(1)},${terminalLocal.dy.toStringAsFixed(1)})'
+      );
+
+      // Create anchors from buffer offsets and set selection
+      final buffer = _terminal!.buffer;
+      final baseAnchor = buffer.createAnchorFromOffset(_dragStartCellOffset!);
+      final extentAnchor = buffer.createAnchorFromOffset(currentCellOffset);
+
+      _terminalController?.setSelection(baseAnchor, extentAnchor);
+    } catch (e, stack) {
+      _logSelection('Error updating selection: $e\n$stack');
+    }
+  }
+
+  void _stopAutoScroll() {
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = null;
   }
 }
