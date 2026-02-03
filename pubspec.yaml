@@ -15,8 +15,9 @@ dependencies:
   # SSH/SFTP
   dartssh2: ^2.13.0
 
-  # Terminal
-  xterm: ^4.0.0
+  # Terminal (forked for per-cell selection invert)
+  xterm:
+    path: packages/xterm
 
   # Google Auth & Drive
   googleapis: ^15.0.0
@@ -57,4 +58,9 @@ flutter:
       fonts:
         - asset: assets/fonts/JetBrainsMono-Regular.ttf
         - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700
+    - family: UbuntuMono
+      fonts:
+        - asset: assets/fonts/UbuntuMono-Regular.ttf
+        - asset: assets/fonts/UbuntuMono-Bold.ttf
           weight: 700
