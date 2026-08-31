@@ -22,7 +22,6 @@ class AuthService extends ChangeNotifier {
 
   static const String _clientSecret = String.fromEnvironment(
     'GOOGLE_CLIENT_SECRET',
-    defaultValue: '***REMOVED***',
   );
 
   static const List<String> _scopes = [
