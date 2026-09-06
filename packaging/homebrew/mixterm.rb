@@ -1,6 +1,10 @@
 cask "mixterm" do
   version "1.0.0"
-  sha256 "REPLACE_WITH_REAL_SHA256_AFTER_FIRST_SIGNED_RELEASE"
+  # This is v1.0.0's real hash, but that build is only ad-hoc signed (no
+  # Developer ID cert configured yet — see packaging/README.md). Don't
+  # submit to homebrew-cask until a release has run with real signing +
+  # notarization, then recompute this from that build instead.
+  sha256 "897cdfec7a743ad6928ddfc1835831dc297c1fa6530e5c3d7c719ff3712e18c4"
 
   url "https://github.com/muhammetali/mixterm/releases/download/v#{version}/mixterm-macos.zip"
   name "MixTerm"

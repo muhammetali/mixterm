@@ -2,8 +2,14 @@
 
 `.github/workflows/release.yml` builds every artifact below on each `v*` tag
 push (or manually via "Run workflow" in the Actions tab) and attaches them to
-a GitHub Release. What's fully automated vs. what needs a one-time manual
-step from you:
+a GitHub Release. **Verified working end-to-end** as of v1.0.0
+(github.com/muhammetali/mixterm/releases/tag/v1.0.0 — all three build jobs
+plus release creation ran clean; getting there took several real CI fixes:
+pinning Flutter to 3.38.9 because dartssh2 2.14.0 fails to compile on newer
+Dart, a `secrets` in `if:` restriction, a snap `organize` wildcard fighting
+stage-packages, and a missing `contents: write` permission for
+`gh release create`). What's fully automated vs. what needs a one-time
+manual step from you:
 
 ## macOS — Homebrew
 
@@ -32,16 +38,17 @@ step from you:
 
 ## Linux — .deb (GitHub Releases)
 
-- **Automated, no account needed.** `scripts/build_deb.sh` runs in CI and
-  the resulting `.deb` is attached to every release. Users:
-  `sudo apt install ./mixterm_<version>_amd64.deb` (or `dpkg -i` + `apt
-  --fix-broken install`).
+- **Automated, no account needed, live today:**
+  github.com/muhammetali/mixterm/releases/download/v1.0.0/mixterm_1.0.0_amd64.deb
+  Users: `sudo apt install ./mixterm_<version>_amd64.deb` (or `dpkg -i` +
+  `apt --fix-broken install`).
 
 ## Linux — Snap
 
-- **Automated:** `snap/snapcraft.yaml` builds a `.snap` in CI and attaches
-  it to the release, so you or anyone can `sudo snap install
-  --dangerous mixterm_<version>_amd64.snap` today.
+- **Automated, live today:** download
+  github.com/muhammetali/mixterm/releases/download/v1.0.0/mixterm_1.0.0_amd64.snap
+  and `sudo snap install --dangerous mixterm_1.0.0_amd64.snap` (`--dangerous`
+  because it isn't Snap-Store-signed yet — see below).
 - **Blocked on you (to reach the real Snap Store / `snap install mixterm`):**
   create a free account at snapcraft.io (Ubuntu One login), then locally:
   `snapcraft login`, `snapcraft register mixterm`, then
