@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../utils/constants.dart';
+
 class AppSettings {
   final bool copyOnSelect;
   final bool pasteOnRightClick;
@@ -17,13 +19,13 @@ class AppSettings {
   const AppSettings({
     this.copyOnSelect = true,
     this.pasteOnRightClick = true,
-    this.fontSize = 14,
+    this.fontSize = AppConstants.defaultFontSize,
     this.fontFamily = 'JetBrainsMono',
     this.fontWeight = 'Normal',
     this.themeMode = ThemeMode.dark,
     this.terminalOpacity = 1.0,
     this.showScrollbar = true,
-    this.scrollbackLines = 10000,
+    this.scrollbackLines = AppConstants.defaultScrollbackLines,
     this.terminalTheme = 'Monokai',
     this.sidebarCollapsed = false,
     this.terminalForegroundColor = 'Default',
@@ -80,13 +82,13 @@ class AppSettings {
     return AppSettings(
       copyOnSelect: json['copyOnSelect'] as bool? ?? true,
       pasteOnRightClick: json['pasteOnRightClick'] as bool? ?? true,
-      fontSize: json['fontSize'] as int? ?? 14,
+      fontSize: json['fontSize'] as int? ?? AppConstants.defaultFontSize,
       fontFamily: json['fontFamily'] as String? ?? 'JetBrainsMono',
       fontWeight: json['fontWeight'] as String? ?? 'Normal',
-      themeMode: ThemeMode.values[json['themeMode'] as int? ?? 2],
+      themeMode: ThemeMode.values[json['themeMode'] as int? ?? ThemeMode.dark.index],
       terminalOpacity: (json['terminalOpacity'] as num?)?.toDouble() ?? 1.0,
       showScrollbar: json['showScrollbar'] as bool? ?? true,
-      scrollbackLines: json['scrollbackLines'] as int? ?? 10000,
+      scrollbackLines: json['scrollbackLines'] as int? ?? AppConstants.defaultScrollbackLines,
       terminalTheme: json['terminalTheme'] as String? ?? 'Monokai',
       sidebarCollapsed: json['sidebarCollapsed'] as bool? ?? false,
       terminalForegroundColor: json['terminalForegroundColor'] as String? ?? 'Default',

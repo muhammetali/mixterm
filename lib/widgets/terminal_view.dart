@@ -90,7 +90,8 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
 
   void _initTerminal() {
     final tabProvider = context.read<TabProvider>();
-    _terminal = tabProvider.getOrCreateTerminal(widget.tabId);
+    final scrollbackLines = context.read<SettingsProvider>().scrollbackLines;
+    _terminal = tabProvider.getOrCreateTerminal(widget.tabId, maxLines: scrollbackLines);
     _terminalController = tabProvider.getTerminalController(widget.tabId);
 
     // Initial connection check
@@ -204,6 +205,11 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
           case SSHConnectionState.error:
             _connectionStatus = ConnectionStatus.error;
             _statusMessage = 'Connection failed';
+            // Defer provider update; an errored session is no longer
+            // connected, so the tab bar's status dot must reflect that too.
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) context.read<TabProvider>().updateTabConnection(widget.tabId, false);
+            });
             break;
         }
       });
@@ -431,7 +437,7 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
             icon: const Icon(Icons.close, size: 18),
             tooltip: 'Disconnect',
             onPressed: () {
-              context.read<ConnectionProvider>().disconnectSSH(widget.tabId);
+              context.read<ConnectionProvider>().disconnectTab(widget.tabId);
               context.read<TabProvider>().removeTab(widget.tabId);
             },
           ),

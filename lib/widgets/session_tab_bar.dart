@@ -42,12 +42,8 @@ class SessionTabBar extends StatelessWidget {
                     final connectionProvider = context.read<ConnectionProvider>();
 
                     void closeTab() {
-                      // Disconnect this tab's specific connection (keyed by tabId)
-                      if (tab.type == TabType.ssh) {
-                        connectionProvider.disconnectSSH(tab.id);
-                      } else {
-                        connectionProvider.disconnectSFTP(tab.id);
-                      }
+                      // Disconnect this tab's connection (keyed by tabId) before removing it
+                      connectionProvider.disconnectTab(tab.id);
                       tabProvider.removeTab(tab.id);
                     }
 

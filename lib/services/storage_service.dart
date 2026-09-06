@@ -11,7 +11,6 @@ class StorageService {
   static const String _backupServersKey = 'servers_backup';
   static const String _settingsKey = 'settings';
   static const String _saltKey = 'encryption_salt';
-  static const String _googleUserKey = 'google_user';
   static const String _lastSyncKey = 'last_sync_timestamp';
   static const String _encryptionModeKey = 'encryption_mode'; // 'device' or 'google'
 
@@ -172,18 +171,6 @@ class StorageService {
     final jsonString = json.encode(settings.toJson());
     await _prefs.setString(_settingsKey, jsonString);
     return true;
-  }
-
-  Future<void> saveGoogleUser(String? email) async {
-    if (email == null) {
-      await _prefs.remove(_googleUserKey);
-    } else {
-      await _prefs.setString(_googleUserKey, email);
-    }
-  }
-
-  String? getGoogleUser() {
-    return _prefs.getString(_googleUserKey);
   }
 
   String? get salt => _salt;

@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import '../../models/server.dart';
 import '../../providers/server_provider.dart';
+import '../../utils/constants.dart';
 import '../../utils/theme.dart';
 
 class AddServerDialog extends StatefulWidget {
@@ -20,7 +21,7 @@ class _AddServerDialogState extends State<AddServerDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _hostController = TextEditingController();
-  final _portController = TextEditingController(text: '22');
+  final _portController = TextEditingController(text: '${AppConstants.defaultPort}');
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passphraseController = TextEditingController();
@@ -92,7 +93,7 @@ class _AddServerDialogState extends State<AddServerDialog> {
       id: widget.server?.id,
       name: _nameController.text.trim(),
       host: _hostController.text.trim(),
-      port: int.tryParse(_portController.text) ?? 22,
+      port: int.tryParse(_portController.text) ?? AppConstants.defaultPort,
       username: _usernameController.text.trim(),
       password: _authType == AuthType.password
           ? _passwordController.text

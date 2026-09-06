@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:xterm/xterm.dart';
 import '../models/tab_session.dart';
+import '../utils/constants.dart';
 
 class TabProvider extends ChangeNotifier {
   final List<TabSession> _tabs = [];
@@ -28,9 +29,11 @@ class TabProvider extends ChangeNotifier {
     return index != null ? _tabs[index] : null;
   }
 
-  Terminal getOrCreateTerminal(String tabId) {
+  /// [maxLines] only takes effect the first time a tab's terminal is
+  /// created; it is not applied retroactively to already-open tabs.
+  Terminal getOrCreateTerminal(String tabId, {int? maxLines}) {
     if (!_terminals.containsKey(tabId)) {
-      _terminals[tabId] = Terminal(maxLines: 10000);
+      _terminals[tabId] = Terminal(maxLines: maxLines ?? AppConstants.defaultScrollbackLines);
       // Create controller with pointer input disabled for mouse events
       // This allows text selection to work even when terminal apps have mouse tracking
       // Only tap events go to terminal, drag events are used for selection

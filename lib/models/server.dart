@@ -1,6 +1,22 @@
 import 'package:uuid/uuid.dart';
 
-enum AuthType { password, key }
+import '../utils/constants.dart';
+
+enum AuthType {
+  password,
+  key;
+
+  /// Parses loosely-formatted values (exact enum names, or free-form text
+  /// like "publickey"/"private key") from imported/legacy data. Password is
+  /// the safe fallback since it requires no key file to be present.
+  static AuthType parse(dynamic value) {
+    final str = value?.toString().toLowerCase().trim() ?? '';
+    if (str == AuthType.key.name || str.contains('key')) {
+      return AuthType.key;
+    }
+    return AuthType.password;
+  }
+}
 
 class Server {
   final String id;
@@ -20,7 +36,7 @@ class Server {
     String? id,
     required this.name,
     required this.host,
-    this.port = 22,
+    this.port = AppConstants.defaultPort,
     required this.username,
     this.password,
     this.privateKey,
@@ -82,15 +98,12 @@ class Server {
       id: json['id'] as String,
       name: json['name'] as String,
       host: json['host'] as String,
-      port: json['port'] as int? ?? 22,
+      port: json['port'] as int? ?? AppConstants.defaultPort,
       username: json['username'] as String,
       password: json['password'] as String?,
       privateKey: json['privateKey'] as String?,
       passphrase: json['passphrase'] as String?,
-      authType: AuthType.values.firstWhere(
-        (e) => e.name == json['authType'],
-        orElse: () => AuthType.password,
-      ),
+      authType: AuthType.parse(json['authType']),
       group: json['group'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),

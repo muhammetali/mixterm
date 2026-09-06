@@ -192,23 +192,6 @@ void main() {
       });
     });
 
-    group('Google user', () {
-      setUp(() async {
-        await storageService.init();
-      });
-
-      test('saves and retrieves google user email', () async {
-        await storageService.saveGoogleUser('test@gmail.com');
-        expect(storageService.getGoogleUser(), equals('test@gmail.com'));
-      });
-
-      test('clears google user when set to null', () async {
-        await storageService.saveGoogleUser('test@gmail.com');
-        await storageService.saveGoogleUser(null);
-        expect(storageService.getGoogleUser(), isNull);
-      });
-    });
-
     group('sync timestamp', () {
       setUp(() async {
         await storageService.init();

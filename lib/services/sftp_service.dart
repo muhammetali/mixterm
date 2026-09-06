@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import '../models/server.dart';
+import '../utils/constants.dart';
 
 class SFTPConnectResult {
   final bool success;
@@ -28,7 +29,7 @@ class SFTPService {
       final socket = await SSHSocket.connect(
         server.host,
         server.port,
-        timeout: const Duration(seconds: 30),
+        timeout: const Duration(seconds: AppConstants.connectionTimeout),
       );
       debugPrint('SFTP: Socket connected');
 

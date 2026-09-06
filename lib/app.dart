@@ -38,6 +38,7 @@ class AppWrapper extends StatefulWidget {
 class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
   bool _isLoading = true;
   ConnectionProvider? _connectionProvider;
+  bool _connectionsCleanedUp = false;
 
   @override
   void initState() {
@@ -69,7 +70,11 @@ class _AppWrapperState extends State<AppWrapper> with WidgetsBindingObserver {
   }
 
   void _cleanupConnections() {
-    // Close all SSH/SFTP connections when app closes
+    // Close all SSH/SFTP connections when app closes. Guarded because both
+    // dispose() and the detached lifecycle callback can call this, and
+    // ChangeNotifier.dispose() throws if called more than once.
+    if (_connectionsCleanedUp) return;
+    _connectionsCleanedUp = true;
     _connectionProvider?.dispose();
   }
 

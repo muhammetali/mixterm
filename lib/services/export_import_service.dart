@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/server.dart';
+import '../utils/constants.dart';
 
 const _uuid = Uuid();
 
@@ -57,7 +58,7 @@ class ExportImportService {
       buffer.writeln('    HostName ${server.host}');
       buffer.writeln('    User ${server.username}');
 
-      if (server.port != 22) {
+      if (server.port != AppConstants.defaultPort) {
         buffer.writeln('    Port ${server.port}');
       }
 
@@ -215,15 +216,15 @@ class ExportImportService {
       // Support various field names for compatibility
       final hostname = host['hostname'] ?? host['ip'] ?? host['host'] ?? '';
       final name = host['name'] ?? host['label'] ?? hostname;
-      final port = host['port'] ?? 22;
+      final port = host['port'] ?? AppConstants.defaultPort;
       final username = host['username'] ?? host['user'] ?? 'root';
-      final authType = _parseAuthType(host['authType']);
+      final authType = AuthType.parse(host['authType']);
 
       return Server(
         id: _uuid.v4(),
         name: name.toString(),
         host: hostname.toString(),
-        port: port is int ? port : int.tryParse(port.toString()) ?? 22,
+        port: port is int ? port : int.tryParse(port.toString()) ?? AppConstants.defaultPort,
         username: username.toString(),
         authType: authType,
         password: host['password']?.toString(),
@@ -240,7 +241,7 @@ class ExportImportService {
     String? currentHost;
     String? hostname;
     String? user;
-    int port = 22;
+    int port = AppConstants.defaultPort;
     String? identityFile;
 
     for (var line in content.split('\n')) {
@@ -263,7 +264,7 @@ class ExportImportService {
         currentHost = null;
         hostname = null;
         user = null;
-        port = 22;
+        port = AppConstants.defaultPort;
         identityFile = null;
         continue;
       }
@@ -294,7 +295,7 @@ class ExportImportService {
           currentHost = value;
           hostname = null;
           user = null;
-          port = 22;
+          port = AppConstants.defaultPort;
           identityFile = null;
           break;
         case 'hostname':
@@ -304,7 +305,7 @@ class ExportImportService {
           user = value;
           break;
         case 'port':
-          port = int.tryParse(value) ?? 22;
+          port = int.tryParse(value) ?? AppConstants.defaultPort;
           break;
         case 'identityfile':
           identityFile = value;
@@ -356,11 +357,11 @@ class ExportImportService {
         name: nameIdx != null && cols.length > nameIdx ? cols[nameIdx] : host,
         host: host,
         port: portIdx != null && cols.length > portIdx
-            ? int.tryParse(cols[portIdx]) ?? 22
-            : 22,
+            ? int.tryParse(cols[portIdx]) ?? AppConstants.defaultPort
+            : AppConstants.defaultPort,
         username: userIdx != null && cols.length > userIdx ? cols[userIdx] : 'root',
         authType: authIdx != null && cols.length > authIdx
-            ? _parseAuthType(cols[authIdx])
+            ? AuthType.parse(cols[authIdx])
             : AuthType.password,
         group: groupIdx != null && cols.length > groupIdx && cols[groupIdx].isNotEmpty
             ? cols[groupIdx]
@@ -473,13 +474,6 @@ class ExportImportService {
       return '"${value.replaceAll('"', '""')}"';
     }
     return value;
-  }
-
-  static AuthType _parseAuthType(dynamic value) {
-    if (value == null) return AuthType.password;
-    final str = value.toString().toLowerCase();
-    if (str.contains('key') || str == 'publickey') return AuthType.key;
-    return AuthType.password;
   }
 
   static List<String> _parseCSVRow(String line) {

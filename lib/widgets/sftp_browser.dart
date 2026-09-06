@@ -576,7 +576,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
             onPressed: () {
               final connectionProvider = context.read<ConnectionProvider>();
               final tabProvider = context.read<TabProvider>();
-              connectionProvider.disconnectSFTP(widget.tabId);
+              connectionProvider.disconnectTab(widget.tabId);
               tabProvider.removeTab(widget.tabId);
             },
           ),

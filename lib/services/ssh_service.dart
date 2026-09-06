@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import '../models/server.dart';
+import '../utils/constants.dart';
 
 enum SSHConnectionState {
   disconnected,
@@ -48,7 +49,7 @@ class SSHService {
       final socket = await SSHSocket.connect(
         server.host,
         server.port,
-        timeout: const Duration(seconds: 30),
+        timeout: const Duration(seconds: AppConstants.connectionTimeout),
       );
       debugPrint('SSH: Socket connected');
 

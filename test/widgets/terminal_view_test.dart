@@ -49,8 +49,10 @@ void main() {
     when(() => mockSettingsProvider.terminalOpacity).thenReturn(1.0);
     when(() => mockSettingsProvider.pasteOnRightClick).thenReturn(true);
     when(() => mockSettingsProvider.copyOnSelect).thenReturn(true);
+    when(() => mockSettingsProvider.scrollbackLines).thenReturn(10000);
 
-    when(() => mockTabProvider.getOrCreateTerminal(any())).thenReturn(terminal);
+    when(() => mockTabProvider.getOrCreateTerminal(any(), maxLines: any(named: 'maxLines')))
+        .thenReturn(terminal);
     when(() => mockTabProvider.getTerminalController(any())).thenReturn(terminalController);
 
     when(() => mockConnectionProvider.getSSHConnection(any())).thenReturn(mockSSHService);
