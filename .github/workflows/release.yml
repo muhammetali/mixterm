@@ -16,9 +16,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pinned to the exact version this project is developed/tested
+      # against. dartssh2 2.14.0 (a direct dependency) fails to compile
+      # on newer Dart SDKs — a real type-promotion bug in its own
+      # sftp_client.dart, not something in this app's code — so floating
+      # to whatever "stable" is on a given CI run isn't safe here.
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: 3.38.9
 
       - run: flutter pub get
       - run: flutter build macos --release
@@ -80,9 +85,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pinned to the exact version this project is developed/tested
+      # against. dartssh2 2.14.0 (a direct dependency) fails to compile
+      # on newer Dart SDKs — a real type-promotion bug in its own
+      # sftp_client.dart, not something in this app's code — so floating
+      # to whatever "stable" is on a given CI run isn't safe here.
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: 3.38.9
 
       - run: sudo apt-get update
       - run: sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
@@ -106,7 +116,7 @@ jobs:
       # set up. This only produces the .snap file; publishing to the Snap
       # Store is a separate, manual `snapcraft upload` step that needs
       # your own Snapcraft/Ubuntu One login (see packaging/README.md).
-      - run: snapcraft --destructive-mode
+      - run: sudo snapcraft --destructive-mode
 
       - uses: actions/upload-artifact@v4
         with:
