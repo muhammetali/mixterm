@@ -127,7 +127,7 @@ jobs:
       # set up. This only produces the .snap file; publishing to the Snap
       # Store is a separate, manual `snapcraft upload` step that needs
       # your own Snapcraft/Ubuntu One login (see packaging/README.md).
-      - run: sudo snapcraft --destructive-mode --debug --verbosity=trace
+      - run: sudo snapcraft --destructive-mode
 
       - uses: actions/upload-artifact@v4
         with:

@@ -54,9 +54,11 @@ parts:
       mkdir -p "$CRAFT_PART_INSTALL/usr/bin"
       ln -sf ../lib/mixterm/mixterm "$CRAFT_PART_INSTALL/usr/bin/mixterm"
       mkdir -p "$CRAFT_PART_INSTALL/usr/share/applications"
-      sed 's|Exec=mixterm|Exec=mixterm|' \
-        "$CRAFT_PROJECT_DIR/linux/runner/mixterm.desktop" \
-        > "$CRAFT_PART_INSTALL/usr/share/applications/com.mixterm.mixterm.desktop"
+      # Exec=mixterm (the bare command name) is correct as-is for a snap
+      # desktop file — snapd rewrites it to route through `snap run` — so
+      # this is a plain copy, unlike the deb/PPA builds' Exec rewrite.
+      cp "$CRAFT_PROJECT_DIR/linux/runner/mixterm.desktop" \
+        "$CRAFT_PART_INSTALL/usr/share/applications/com.mixterm.mixterm.desktop"
       for size in 16 24 32 48 64 128 256 512; do
         dir="$CRAFT_PART_INSTALL/usr/share/icons/hicolor/${size}x${size}/apps"
         mkdir -p "$dir"
