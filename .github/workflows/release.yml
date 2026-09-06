@@ -9,6 +9,10 @@ on:
 jobs:
   build-macos:
     runs-on: macos-14
+    env:
+      # `if:` can't reference `secrets` directly; mirror it into `env` so
+      # the signing/notarization steps below can check for its presence.
+      HAS_APPLE_CERT: ${{ secrets.APPLE_CERT_P12 != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -24,7 +28,7 @@ jobs:
       # this step is skipped and the app stays ad-hoc signed, matching
       # the existing CODE_SIGN_IDENTITY = "-" project setting.
       - name: Codesign with Developer ID
-        if: ${{ secrets.APPLE_CERT_P12 != '' }}
+        if: ${{ env.HAS_APPLE_CERT == 'true' }}
         env:
           APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12 }}
           APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
@@ -43,7 +47,7 @@ jobs:
             build/macos/Build/Products/Release/mixterm.app
 
       - name: Notarize
-        if: ${{ secrets.APPLE_CERT_P12 != '' }}
+        if: ${{ env.HAS_APPLE_CERT == 'true' }}
         env:
           APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
