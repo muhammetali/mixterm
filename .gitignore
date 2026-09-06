@@ -28,6 +28,7 @@ client_secret_*.json
 .env
 .env.*
 !.env.example
+lib/services/google_oauth_secret.dart
 
 # Generated
 *.g.dart

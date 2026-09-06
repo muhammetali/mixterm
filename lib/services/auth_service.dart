@@ -7,33 +7,36 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'google_oauth_secret.dart';
+
 class AuthService extends ChangeNotifier {
-  // OAuth credentials from Google Cloud Console
-  // Get your own credentials:
+  // OAuth credentials from Google Cloud Console (project "mixterm",
+  // client "xterm-desktop"). Get your own if self-hosting:
   // 1. Go to https://console.cloud.google.com/
   // 2. Create a project and enable Google Drive API
   // 3. Create OAuth 2.0 Client ID (Desktop app type)
-  // 4. Optionally set GOOGLE_CLIENT_ID via --dart-define, or update the
-  //    defaultValue below
+  // 4. Override via --dart-define=GOOGLE_CLIENT_ID=..., or update the
+  //    default below
   static const String _clientId = String.fromEnvironment(
     'GOOGLE_CLIENT_ID',
     defaultValue: '449803261214-6p5oc4no7cav8gh7kj4am1qg9elvk55u.apps.googleusercontent.com',
   );
 
-  // No client secret: Desktop-app OAuth clients are public clients per
-  // Google's own guidance (a secret can't actually be kept confidential in
-  // a distributed binary), and this flow already uses PKCE (see
-  // googleapis_auth's AuthorizationCodeGrantServerFlow/createCodeVerifier)
-  // for security instead. `String.fromEnvironment` returns '' rather than
-  // null when GOOGLE_CLIENT_SECRET isn't provided, and googleapis_auth
-  // only omits `client_secret` from the token request when ClientId.secret
-  // is exactly null (not merely empty) — sending '' reads to Google as
-  // "client_secret is missing" (HTTP 400) instead of "not sent". Route
-  // through this getter so every build (not just ones passing
-  // --dart-define=GOOGLE_CLIENT_SECRET=...) gets the correct, working,
-  // secret-free flow.
-  static const String _clientSecretEnv = String.fromEnvironment('GOOGLE_CLIENT_SECRET');
-  static String? get _clientSecret => _clientSecretEnv.isEmpty ? null : _clientSecretEnv;
+  // A "Desktop app" OAuth client's secret is explicitly *not* confidential
+  // per Google's own docs (OAuth 2.0 for Mobile & Desktop Apps: "the client
+  // secret is obviously included in the application... it is not treated
+  // as a secret") — it can't be kept confidential in a distributed binary
+  // regardless. But it must still be non-empty: googleapis_auth's
+  // authorization-code-grant flow (used by signIn()) always sends
+  // `client_secret` in the token exchange even though it also uses PKCE, so
+  // an empty/missing value gets rejected with HTTP 400 "client_secret is
+  // missing". The value itself lives in google_oauth_secret.dart, which is
+  // gitignored only because GitHub's push protection blocks any
+  // GOCSPX-shaped string in a commit — see that file's setup instructions.
+  static const String _clientSecret = String.fromEnvironment(
+    'GOOGLE_CLIENT_SECRET',
+    defaultValue: googleOAuthClientSecret,
+  );
 
   static const List<String> _scopes = [
     'email',
@@ -55,8 +58,6 @@ class AuthService extends ChangeNotifier {
   String? get userPhoto => _userPhoto;
   String? get userId => _userId;
 
-  // Client identifier for OAuth — see _clientSecret's doc comment for why
-  // this intentionally has no secret unless GOOGLE_CLIENT_SECRET is set.
   final _clientIdentifier = ClientId(_clientId, _clientSecret);
 
   @visibleForTesting

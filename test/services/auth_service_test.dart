@@ -16,15 +16,16 @@ void main() {
     });
 
     group('OAuth client configuration', () {
-      test('client secret is null (not empty) when GOOGLE_CLIENT_SECRET is unset', () {
-        // Regression test: googleapis_auth only omits `client_secret` from
-        // the token request when ClientId.secret is exactly null — an
-        // empty string is sent as `client_secret=` and Google's server
-        // rejects it as "invalid_request: client_secret is missing"
-        // (HTTP 400). String.fromEnvironment yields '' rather than null
-        // when the define isn't provided, so AuthService must translate
-        // that itself rather than passing it straight through to ClientId.
-        expect(authService.debugClientId.secret, isNull);
+      test('client secret has a non-empty default when GOOGLE_CLIENT_SECRET is unset', () {
+        // Regression test: googleapis_auth's obtainAccessCredentialsViaCodeExchange
+        // (used by signIn()) unconditionally sends `client_secret: clientId.secret
+        // ?? ''` during the token exchange, even though PKCE is also used — so a
+        // null OR empty secret both result in Google's server rejecting the
+        // request with "invalid_request: client_secret is missing" (HTTP 400).
+        // Desktop-app OAuth client secrets aren't confidential per Google's own
+        // docs, so AuthService embeds a real default rather than leaving it null.
+        expect(authService.debugClientId.secret, isNotNull);
+        expect(authService.debugClientId.secret, isNotEmpty);
       });
 
       test('client id is configured', () {
