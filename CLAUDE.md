@@ -81,8 +81,11 @@ Provider pattern with ChangeNotifier. Data flow: Widget → Provider → Service
 - `googleapis` + `googleapis_auth` - Google Drive sync
 
 ### Storage Locations
-- Linux: `~/.local/share/mixterm/`
-- macOS: `~/Library/Application Support/mixterm/`
+- Encrypted server credentials and settings live in `SharedPreferences`
+  (platform-native prefs storage), not a file under the app support directory.
+- Only the device-derived encryption key file lives under
+  `getApplicationSupportDirectory()`: Linux `~/.local/share/mixterm/`,
+  macOS `~/Library/Application Support/mixterm/`.
 
 ## Key Technical Details
 
