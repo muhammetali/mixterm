@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+# The Flutter bundle in bundle/ is prebuilt by CI and shipped inside the
+# orig tarball (see debian/control) — there is nothing to compile here.
+
+%:
+	dh $@ --no-parallel
+
+override_dh_auto_build:
+	# no-op: nothing to compile
+
+override_dh_auto_install:
+	mkdir -p debian/mixterm/usr/lib/mixterm
+	cp -r bundle/. debian/mixterm/usr/lib/mixterm/
+	mkdir -p debian/mixterm/usr/bin
+	ln -sf /usr/lib/mixterm/mixterm debian/mixterm/usr/bin/mixterm
+	mkdir -p debian/mixterm/usr/share/applications
+	sed 's|Exec=mixterm|Exec=/usr/bin/mixterm|' linux/runner/mixterm.desktop \
+		> debian/mixterm/usr/share/applications/com.mixterm.mixterm.desktop
+	for size in 16 24 32 48 64 128 256 512; do \
+		dir=debian/mixterm/usr/share/icons/hicolor/$${size}x$${size}/apps; \
+		mkdir -p "$$dir"; \
+		cp assets/icons/linux/mixterm_$${size}.png "$$dir/mixterm.png"; \
+	done
+
+override_dh_shlibdeps:
+	# The bundled libflutter_linux_gtk.so etc. aren't system libraries;
+	# skip automatic shlibdeps scanning of the vendored bundle/ tree.

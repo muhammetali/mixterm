@@ -1,0 +1,40 @@
+app-id: com.mixterm.mixterm
+runtime: org.gnome.Platform
+runtime-version: '46'
+sdk: org.gnome.Sdk
+command: mixterm
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --filesystem=home
+  - --filesystem=xdg-run/gvfs
+
+modules:
+  - name: mixterm
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 bundle/mixterm /app/bin/mixterm
+      - cp -r bundle/lib /app/bin/lib
+      - cp -r bundle/data /app/bin/data
+      - install -Dm644 com.mixterm.mixterm.desktop /app/share/applications/com.mixterm.mixterm.desktop
+      - install -Dm644 icons/mixterm_128.png /app/share/icons/hicolor/128x128/apps/com.mixterm.mixterm.png
+      - install -Dm644 icons/mixterm_256.png /app/share/icons/hicolor/256x256/apps/com.mixterm.mixterm.png
+      - install -Dm644 icons/mixterm_512.png /app/share/icons/hicolor/512x512/apps/com.mixterm.mixterm.png
+    sources:
+      # Populated by CI from a `flutter build linux --release` output
+      # (see .github/workflows/release.yml's flatpak job) since Flatpak's
+      # sandboxed build has no network access to run `flutter pub get`
+      # itself. This module installs the already-compiled bundle rather
+      # than compiling from source in-sandbox.
+      - type: dir
+        path: ../../build/linux/x64/release
+        dest: bundle
+      - type: file
+        path: ../../linux/runner/mixterm.desktop
+        dest-filename: com.mixterm.mixterm.desktop
+      - type: dir
+        path: ../../assets/icons/linux
+        dest: icons

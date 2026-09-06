@@ -1,0 +1,12 @@
+Package: mixterm
+Version: __VERSION__
+Section: net
+Priority: optional
+Architecture: amd64
+Depends: libgtk-3-0
+Maintainer: Muhammet Ali Özçelik <noreply@mixterm.app>
+Homepage: https://github.com/muhammetali/mixterm
+Description: Professional SSH/SFTP client for Linux
+ MixTerm is a professional SSH/SFTP client with multi-tab terminal
+ sessions, a visual SFTP file browser, AES-256 encrypted credential
+ storage, and Google Drive cloud sync.

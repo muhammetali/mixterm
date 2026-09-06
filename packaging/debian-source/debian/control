@@ -1,0 +1,21 @@
+Source: mixterm
+Section: net
+Priority: optional
+Maintainer: Muhammet Ali Özçelik <noreply@mixterm.app>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+Homepage: https://github.com/muhammetali/mixterm
+
+Package: mixterm
+Architecture: amd64
+Depends: libgtk-3-0, ${misc:Depends}
+Description: Professional SSH/SFTP client for Linux
+ MixTerm is a professional SSH/SFTP client with multi-tab terminal
+ sessions, a visual SFTP file browser, AES-256 encrypted credential
+ storage, and Google Drive cloud sync.
+ .
+ This package ships a prebuilt Flutter release bundle rather than
+ compiling from source: Launchpad's PPA build farm has no network
+ access during the build, which the Flutter/Dart toolchain requires
+ (pub package fetch, engine artifact downloads). The bundle is built
+ by this project's own CI and included in the orig tarball.
