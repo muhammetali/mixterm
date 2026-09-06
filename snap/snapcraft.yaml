@@ -39,12 +39,18 @@ parts:
     # Relative to the project root (where `snapcraft` is invoked from in
     # CI), not to this snap/ directory.
     source: build/linux/x64/release/bundle
-    organize:
-      "*": usr/lib/mixterm/
     stage-packages:
       - libgtk-3-0
     override-build: |
       craftctl default
+      # Move only the dumped bundle's own top-level entries into
+      # usr/lib/mixterm/ — NOT a blanket `organize: "*"`, which also
+      # matches stage-packages' own usr/ tree (already extracted into
+      # this same install dir by `craftctl default`) and fails trying to
+      # move usr/ into usr/lib/mixterm/usr/.
+      mkdir -p "$CRAFT_PART_INSTALL/usr/lib/mixterm"
+      mv "$CRAFT_PART_INSTALL"/mixterm "$CRAFT_PART_INSTALL"/lib "$CRAFT_PART_INSTALL"/data \
+        "$CRAFT_PART_INSTALL/usr/lib/mixterm/"
       mkdir -p "$CRAFT_PART_INSTALL/usr/bin"
       ln -sf ../lib/mixterm/mixterm "$CRAFT_PART_INSTALL/usr/bin/mixterm"
       mkdir -p "$CRAFT_PART_INSTALL/usr/share/applications"
