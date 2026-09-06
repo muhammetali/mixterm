@@ -36,7 +36,9 @@ parts:
     # on GitHub's runners. Reusing one already-built, already-tested
     # bundle across deb/snap/PPA avoids all of that.
     plugin: dump
-    source: ../build/linux/x64/release/bundle
+    # Relative to the project root (where `snapcraft` is invoked from in
+    # CI), not to this snap/ directory.
+    source: build/linux/x64/release/bundle
     organize:
       "*": usr/lib/mixterm/
     stage-packages:
