@@ -71,20 +71,6 @@ void main() {
       });
     });
 
-    group('SSHConnectResult', () {
-      test('creates success result with ok() factory', () {
-        final result = SSHConnectResult.ok();
-        expect(result.success, isTrue);
-        expect(result.error, isNull);
-      });
-
-      test('creates failure result with fail() factory', () {
-        final result = SSHConnectResult.fail('Connection timeout');
-        expect(result.success, isFalse);
-        expect(result.error, equals('Connection timeout'));
-      });
-    });
-
     group('SSHConnectionState', () {
       test('has correct enum values', () {
         expect(SSHConnectionState.values, contains(SSHConnectionState.disconnected));

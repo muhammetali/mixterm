@@ -2,25 +2,24 @@ import 'package:flutter/foundation.dart';
 import '../models/server.dart';
 import '../services/ssh_service.dart';
 import '../services/sftp_service.dart';
-
-class ConnectionResult<T> {
-  final bool success;
-  final T? service;
-  final String? error;
-
-  ConnectionResult({required this.success, this.service, this.error});
-
-  factory ConnectionResult.ok(T service) =>
-      ConnectionResult(success: true, service: service);
-
-  factory ConnectionResult.fail(String error) =>
-      ConnectionResult(success: false, error: error);
-}
+import '../utils/result.dart';
 
 /// Connection provider that manages SSH/SFTP connections per tab.
 /// Each tab has its own independent connection, allowing multiple
 /// sessions to the same server.
 class ConnectionProvider extends ChangeNotifier {
+  final SSHService Function() _createSSHService;
+  final SFTPService Function() _createSFTPService;
+
+  /// [createSSHService]/[createSFTPService] are injectable so tests can
+  /// supply fakes instead of opening real sockets. Defaults to the real
+  /// services for production use.
+  ConnectionProvider({
+    SSHService Function()? createSSHService,
+    SFTPService Function()? createSFTPService,
+  })  : _createSSHService = createSSHService ?? SSHService.new,
+        _createSFTPService = createSFTPService ?? SFTPService.new;
+
   // Connections keyed by tabId for independent sessions per tab
   final Map<String, SSHService> _sshConnections = {};
   final Map<String, SFTPService> _sftpConnections = {};
@@ -55,10 +54,10 @@ class ConnectionProvider extends ChangeNotifier {
   String? getServerIdForTab(String tabId) => _tabServerMap[tabId];
 
   /// Connect SSH for a specific tab - creates independent connection
-  Future<ConnectionResult<SSHService>> connectSSH(Server server, String tabId) async {
+  Future<Result<SSHService>> connectSSH(Server server, String tabId) async {
     // Race condition prevention
     if (_connectingTabs.contains(tabId)) {
-      return ConnectionResult.fail('Connection already in progress');
+      return Result.fail('Connection already in progress');
     }
 
     // Check if this tab already has a connection
@@ -68,7 +67,7 @@ class ConnectionProvider extends ChangeNotifier {
         _activeTabId = tabId;
         _activeConnectionType = 'ssh';
         notifyListeners();
-        return ConnectionResult.ok(existing);
+        return Result.ok(existing);
       }
     }
 
@@ -76,7 +75,7 @@ class ConnectionProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final sshService = SSHService();
+      final sshService = _createSSHService();
       final result = await sshService.connect(server);
 
       if (result.success) {
@@ -85,10 +84,10 @@ class ConnectionProvider extends ChangeNotifier {
         _activeTabId = tabId;
         _activeConnectionType = 'ssh';
         notifyListeners();
-        return ConnectionResult.ok(sshService);
+        return Result.ok(sshService);
       }
 
-      return ConnectionResult.fail(result.error ?? 'Connection failed');
+      return Result.fail(result.error ?? 'Connection failed');
     } finally {
       _connectingTabs.remove(tabId);
       notifyListeners();
@@ -96,10 +95,10 @@ class ConnectionProvider extends ChangeNotifier {
   }
 
   /// Connect SFTP for a specific tab - creates independent connection
-  Future<ConnectionResult<SFTPService>> connectSFTP(Server server, String tabId) async {
+  Future<Result<SFTPService>> connectSFTP(Server server, String tabId) async {
     // Race condition prevention
     if (_connectingTabs.contains(tabId)) {
-      return ConnectionResult.fail('Connection already in progress');
+      return Result.fail('Connection already in progress');
     }
 
     // Check if this tab already has a connection
@@ -109,7 +108,7 @@ class ConnectionProvider extends ChangeNotifier {
         _activeTabId = tabId;
         _activeConnectionType = 'sftp';
         notifyListeners();
-        return ConnectionResult.ok(existing);
+        return Result.ok(existing);
       }
     }
 
@@ -117,7 +116,7 @@ class ConnectionProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final sftpService = SFTPService();
+      final sftpService = _createSFTPService();
       final result = await sftpService.connect(server);
 
       if (result.success) {
@@ -126,10 +125,10 @@ class ConnectionProvider extends ChangeNotifier {
         _activeTabId = tabId;
         _activeConnectionType = 'sftp';
         notifyListeners();
-        return ConnectionResult.ok(sftpService);
+        return Result.ok(sftpService);
       }
 
-      return ConnectionResult.fail(result.error ?? 'Connection failed');
+      return Result.fail(result.error ?? 'Connection failed');
     } finally {
       _connectingTabs.remove(tabId);
       notifyListeners();

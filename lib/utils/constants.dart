@@ -5,6 +5,11 @@ class AppConstants {
   static const int defaultPort = 22;
   static const int connectionTimeout = 30;
 
+  /// Interval at which dartssh2's [SSHClient] sends a
+  /// `keepalive@openssh.com` global request to keep idle SSH/SFTP
+  /// connections alive through NATs/firewalls that drop quiet sockets.
+  static const int sshKeepAliveIntervalSeconds = 15;
+
   static const int minFontSize = 8;
   static const int maxFontSize = 32;
   static const int defaultFontSize = 14;

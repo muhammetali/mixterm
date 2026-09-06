@@ -1,71 +1,16 @@
 import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:mixterm/models/server.dart';
 import 'package:mixterm/providers/connection_provider.dart';
 import 'package:mixterm/services/ssh_service.dart';
 import 'package:mixterm/services/sftp_service.dart';
+import 'package:mixterm/utils/result.dart';
 
 // Mock classes
 class MockSSHService extends Mock implements SSHService {}
 class MockSFTPService extends Mock implements SFTPService {}
-
-// Testable ConnectionProvider that allows injecting mock services
-class TestableConnectionProvider extends ConnectionProvider {
-  final SSHService Function() sshServiceFactory;
-  final SFTPService Function() sftpServiceFactory;
-
-  TestableConnectionProvider({
-    required this.sshServiceFactory,
-    required this.sftpServiceFactory,
-  });
-
-  @override
-  Future<ConnectionResult<SSHService>> connectSSH(Server server, String tabId) async {
-    // Use parent's locking mechanism
-    if (isConnecting(tabId)) {
-      return ConnectionResult.fail('Connection already in progress');
-    }
-
-    // Check existing connection
-    final existing = getSSHConnection(tabId);
-    if (existing != null && existing.isConnected) {
-      return ConnectionResult.ok(existing);
-    }
-
-    // Create mock service instead of real one
-    final sshService = sshServiceFactory();
-    final result = await sshService.connect(server);
-
-    if (result.success) {
-      // We need to access private members, so we call super and override
-      return ConnectionResult.ok(sshService);
-    }
-
-    return ConnectionResult.fail(result.error ?? 'Connection failed');
-  }
-
-  @override
-  Future<ConnectionResult<SFTPService>> connectSFTP(Server server, String tabId) async {
-    if (isConnecting(tabId)) {
-      return ConnectionResult.fail('Connection already in progress');
-    }
-
-    final existing = getSFTPConnection(tabId);
-    if (existing != null && existing.isConnected) {
-      return ConnectionResult.ok(existing);
-    }
-
-    final sftpService = sftpServiceFactory();
-    final result = await sftpService.connect(server);
-
-    if (result.success) {
-      return ConnectionResult.ok(sftpService);
-    }
-
-    return ConnectionResult.fail(result.error ?? 'Connection failed');
-  }
-}
 
 void main() {
   late Server testServer;
@@ -96,7 +41,7 @@ void main() {
 
     // Default successful connection behavior
     when(() => mockSSHService.connect(any())).thenAnswer(
-      (_) async => SSHConnectResult(success: true),
+      (_) async => VoidResult.ok(),
     );
     when(() => mockSSHService.isConnected).thenReturn(true);
     when(() => mockSSHService.disconnect()).thenAnswer((_) async {});
@@ -107,54 +52,73 @@ void main() {
     when(() => mockSSHService.outputStream).thenAnswer((_) => const Stream.empty());
 
     when(() => mockSFTPService.connect(any())).thenAnswer(
-      (_) async => SFTPConnectResult(success: true),
+      (_) async => VoidResult.ok(),
     );
     when(() => mockSFTPService.isConnected).thenReturn(true);
     when(() => mockSFTPService.disconnect()).thenAnswer((_) async {});
   });
 
+  ConnectionProvider buildProvider() => ConnectionProvider(
+        createSSHService: () => mockSSHService,
+        createSFTPService: () => mockSFTPService,
+      );
+
   group('ConnectionProvider Initial State', () {
     test('starts with no active tab', () {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
       expect(provider.activeTabId, isNull);
       expect(provider.activeConnectionType, isNull);
     });
 
     test('starts with no connections', () {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
       expect(provider.activeSSHConnections, isEmpty);
       expect(provider.activeSFTPConnections, isEmpty);
     });
   });
 
   group('ConnectionProvider SSH Connection', () {
-    test('connectSSH creates new connection for tab', () async {
-      final provider = TestableConnectionProvider(
-        sshServiceFactory: () => mockSSHService,
-        sftpServiceFactory: () => mockSFTPService,
-      );
+    test('connectSSH creates new connection for tab using the injected factory', () async {
+      final provider = buildProvider();
 
       final result = await provider.connectSSH(testServer, 'tab_1');
 
       expect(result.success, true);
-      expect(result.service, isNotNull);
+      expect(result.data, same(mockSSHService));
       verify(() => mockSSHService.connect(testServer)).called(1);
+
+      // The real connectSSH logic (not a hand-rolled test double) is what
+      // ran here, so these must reflect actual provider state too.
+      expect(provider.getSSHConnection('tab_1'), same(mockSSHService));
+      expect(provider.isSSHConnected('tab_1'), isTrue);
+      expect(provider.getServerIdForTab('tab_1'), testServer.id);
+      expect(provider.activeTabId, 'tab_1');
+      expect(provider.activeConnectionType, 'ssh');
     });
 
     test('connectSSH fails with error message on connection failure', () async {
       when(() => mockSSHService.connect(any())).thenAnswer(
-        (_) async => SSHConnectResult(success: false, error: 'Auth failed'),
+        (_) async => VoidResult.fail('Auth failed'),
       );
 
-      final provider = TestableConnectionProvider(
-        sshServiceFactory: () => mockSSHService,
-        sftpServiceFactory: () => mockSFTPService,
-      );
+      final provider = buildProvider();
 
       final result = await provider.connectSSH(testServer, 'tab_1');
 
       expect(result.success, false);
       expect(result.error, 'Auth failed');
+      expect(provider.getSSHConnection('tab_1'), isNull);
+    });
+
+    test('reconnecting an already-connected tab reuses the existing service', () async {
+      final provider = buildProvider();
+
+      final first = await provider.connectSSH(testServer, 'tab_1');
+      final second = await provider.connectSSH(testServer, 'tab_1');
+
+      expect(first.data, same(second.data));
+      // Only the first call should have actually opened a connection.
+      verify(() => mockSSHService.connect(testServer)).called(1);
     });
 
     test('same server can have multiple independent SSH connections on different tabs', () async {
@@ -163,21 +127,21 @@ void main() {
       var callCount = 0;
 
       when(() => mockSSH1.connect(any())).thenAnswer(
-        (_) async => SSHConnectResult(success: true),
+        (_) async => VoidResult.ok(),
       );
       when(() => mockSSH1.isConnected).thenReturn(true);
 
       when(() => mockSSH2.connect(any())).thenAnswer(
-        (_) async => SSHConnectResult(success: true),
+        (_) async => VoidResult.ok(),
       );
       when(() => mockSSH2.isConnected).thenReturn(true);
 
-      final provider = TestableConnectionProvider(
-        sshServiceFactory: () {
+      final provider = ConnectionProvider(
+        createSSHService: () {
           callCount++;
           return callCount == 1 ? mockSSH1 : mockSSH2;
         },
-        sftpServiceFactory: () => mockSFTPService,
+        createSFTPService: () => mockSFTPService,
       );
 
       final result1 = await provider.connectSSH(testServer, 'tab_1');
@@ -188,32 +152,45 @@ void main() {
       // Two separate connections were made (to the same server)
       verify(() => mockSSH1.connect(testServer)).called(1);
       verify(() => mockSSH2.connect(testServer)).called(1);
+      expect(provider.getSSHConnection('tab_1'), same(mockSSH1));
+      expect(provider.getSSHConnection('tab_2'), same(mockSSH2));
+    });
+
+    test('rejects a second connectSSH call for the same tab while one is in flight', () async {
+      final gate = Completer<VoidResult>();
+      when(() => mockSSHService.connect(any())).thenAnswer((_) => gate.future);
+
+      final provider = buildProvider();
+
+      final first = provider.connectSSH(testServer, 'tab_1');
+      final second = await provider.connectSSH(testServer, 'tab_1');
+
+      expect(second.success, false);
+      expect(second.error, 'Connection already in progress');
+
+      gate.complete(VoidResult.ok());
+      await first;
     });
   });
 
   group('ConnectionProvider SFTP Connection', () {
     test('connectSFTP creates new connection for tab', () async {
-      final provider = TestableConnectionProvider(
-        sshServiceFactory: () => mockSSHService,
-        sftpServiceFactory: () => mockSFTPService,
-      );
+      final provider = buildProvider();
 
       final result = await provider.connectSFTP(testServer, 'tab_1');
 
       expect(result.success, true);
-      expect(result.service, isNotNull);
+      expect(result.data, same(mockSFTPService));
       verify(() => mockSFTPService.connect(testServer)).called(1);
+      expect(provider.getSFTPConnection('tab_1'), same(mockSFTPService));
     });
 
     test('connectSFTP fails with error message on connection failure', () async {
       when(() => mockSFTPService.connect(any())).thenAnswer(
-        (_) async => SFTPConnectResult(success: false, error: 'Connection refused'),
+        (_) async => VoidResult.fail('Connection refused'),
       );
 
-      final provider = TestableConnectionProvider(
-        sshServiceFactory: () => mockSSHService,
-        sftpServiceFactory: () => mockSFTPService,
-      );
+      final provider = buildProvider();
 
       final result = await provider.connectSFTP(testServer, 'tab_1');
 
@@ -224,44 +201,50 @@ void main() {
 
   group('ConnectionProvider Connection Queries', () {
     test('isSSHConnected returns false for non-existent tab', () {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
       expect(provider.isSSHConnected('non_existent_tab'), false);
     });
 
     test('isSFTPConnected returns false for non-existent tab', () {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
       expect(provider.isSFTPConnected('non_existent_tab'), false);
     });
 
     test('getSSHConnection returns null for non-existent tab', () {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
       expect(provider.getSSHConnection('non_existent_tab'), isNull);
     });
 
     test('getSFTPConnection returns null for non-existent tab', () {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
       expect(provider.getSFTPConnection('non_existent_tab'), isNull);
     });
 
     test('getServerIdForTab returns null for non-existent tab', () {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
       expect(provider.getServerIdForTab('non_existent_tab'), isNull);
     });
 
     test('hasAnySSHConnectionForServer returns false when no connections', () {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
       expect(provider.hasAnySSHConnectionForServer('server_1'), false);
     });
 
     test('hasAnySFTPConnectionForServer returns false when no connections', () {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
       expect(provider.hasAnySFTPConnectionForServer('server_1'), false);
+    });
+
+    test('hasAnySSHConnectionForServer returns true once connected', () async {
+      final provider = buildProvider();
+      await provider.connectSSH(testServer, 'tab_1');
+      expect(provider.hasAnySSHConnectionForServer(testServer.id), isTrue);
     });
   });
 
   group('ConnectionProvider setActive', () {
     test('setActive updates active tab and type', () {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
 
       provider.setActive('tab_1', 'ssh');
 
@@ -270,7 +253,7 @@ void main() {
     });
 
     test('setActive notifies listeners', () {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
       var notified = false;
       provider.addListener(() => notified = true);
 
@@ -282,28 +265,34 @@ void main() {
 
   group('ConnectionProvider Disconnect', () {
     test('disconnectSSH handles non-existent tab gracefully', () async {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
 
       // Should not throw
       await provider.disconnectSSH('non_existent_tab');
     });
 
     test('disconnectSFTP handles non-existent tab gracefully', () async {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
 
       // Should not throw
       await provider.disconnectSFTP('non_existent_tab');
     });
 
-    test('disconnectTab disconnects both SSH and SFTP', () async {
-      final provider = ConnectionProvider();
+    test('disconnectTab disconnects both SSH and SFTP for that tab', () async {
+      final provider = buildProvider();
+      await provider.connectSSH(testServer, 'tab_1');
+      await provider.connectSFTP(testServer, 'tab_1');
 
-      // Should not throw even with no connections
       await provider.disconnectTab('tab_1');
+
+      verify(() => mockSSHService.disconnect()).called(1);
+      verify(() => mockSFTPService.disconnect()).called(1);
+      expect(provider.getSSHConnection('tab_1'), isNull);
+      expect(provider.getSFTPConnection('tab_1'), isNull);
     });
 
     test('disconnectAllForServer handles empty connections', () async {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
 
       // Should not throw
       await provider.disconnectAllForServer('server_1');
@@ -312,7 +301,7 @@ void main() {
 
   group('ConnectionProvider isConnecting', () {
     test('isConnecting returns false for non-connecting tab', () {
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
       expect(provider.isConnecting('tab_1'), false);
     });
   });
@@ -320,7 +309,7 @@ void main() {
   group('ConnectionProvider Notification', () {
     test('setActive notifies listeners on state changes', () {
       var notificationCount = 0;
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
 
       provider.addListener(() => notificationCount++);
 
@@ -332,7 +321,7 @@ void main() {
 
     test('multiple setActive calls notify multiple times', () {
       var notificationCount = 0;
-      final provider = ConnectionProvider();
+      final provider = buildProvider();
 
       provider.addListener(() => notificationCount++);
 
@@ -341,25 +330,6 @@ void main() {
       provider.setActive('tab_1', 'ssh');
 
       expect(notificationCount, equals(3));
-    });
-  });
-
-  group('ConnectionResult', () {
-    test('ConnectionResult.ok creates successful result', () {
-      final service = MockSSHService();
-      final result = ConnectionResult.ok(service);
-
-      expect(result.success, true);
-      expect(result.service, service);
-      expect(result.error, isNull);
-    });
-
-    test('ConnectionResult.fail creates failed result', () {
-      final result = ConnectionResult<SSHService>.fail('Error message');
-
-      expect(result.success, false);
-      expect(result.service, isNull);
-      expect(result.error, 'Error message');
     });
   });
 }

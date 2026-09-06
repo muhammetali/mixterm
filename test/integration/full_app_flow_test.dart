@@ -16,6 +16,7 @@ import 'package:mixterm/services/sync_service.dart';
 import 'package:mixterm/services/auth_service.dart';
 import 'package:mixterm/screens/home_screen.dart';
 import 'package:mixterm/widgets/terminal_view.dart';
+import 'package:mixterm/utils/result.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Mocks
@@ -23,25 +24,6 @@ class MockSSHService extends Mock implements SSHService {}
 class MockStorageService extends Mock implements StorageService {}
 class MockSyncService extends Mock implements SyncService {}
 class MockAuthService extends Mock implements AuthService {}
-
-// Fake Providers
-class FakeConnectionProvider extends ConnectionProvider {
-  final SSHService _mockSSHService;
-
-  FakeConnectionProvider(this._mockSSHService);
-
-  @override
-  SSHService? getSSHConnection(String tabId) {
-    return _mockSSHService;
-  }
-
-  @override
-  Future<ConnectionResult<SSHService>> connectSSH(Server server, String tabId) async {
-    await Future.delayed(const Duration(milliseconds: 10));
-    notifyListeners();
-    return ConnectionResult.ok(_mockSSHService);
-  }
-}
 
 void main() {
   late MockSSHService mockSSHService;
@@ -70,6 +52,10 @@ void main() {
     when(() => mockSSHService.isConnected).thenReturn(true);
     when(() => mockSSHService.dispose()).thenAnswer((_) async {});
     when(() => mockSSHService.resize(any(), any())).thenAnswer((_) async {});
+    when(() => mockSSHService.connect(any())).thenAnswer((_) async {
+      await Future.delayed(const Duration(milliseconds: 10));
+      return VoidResult.ok();
+    });
 
     // Default Storage behaviors
     when(() => mockStorageService.loadServers(useBackup: any(named: 'useBackup'))).thenAnswer((_) async => []);
@@ -116,7 +102,9 @@ void main() {
     final serverProvider = ServerProvider(mockStorageService, mockSyncService);
     final tabProvider = TabProvider();
     final transferProvider = TransferProvider();
-    final connectionProvider = FakeConnectionProvider(mockSSHService);
+    final connectionProvider = ConnectionProvider(
+      createSSHService: () => mockSSHService,
+    );
 
     final testServer = Server(
       id: 'server_1',

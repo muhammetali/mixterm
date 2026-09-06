@@ -40,6 +40,7 @@ void main() {
     when(() => mockSettingsProvider.sidebarCollapsed).thenReturn(false);
     when(() => mockServerProvider.isLoading).thenReturn(false);
     when(() => mockServerProvider.servers).thenReturn([]);
+    when(() => mockServerProvider.groups).thenReturn([]);
   });
 
   group('ServerList Widget Tests', () {
@@ -88,8 +89,8 @@ void main() {
       ];
 
       when(() => mockServerProvider.servers).thenReturn(testServers);
-      when(() => mockConnectionProvider.isSSHConnected(any())).thenReturn(false);
-      when(() => mockConnectionProvider.isSFTPConnected(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer(any())).thenReturn(false);
 
       await tester.pumpWidget(createServerList());
       await tester.pumpAndSettle();
@@ -103,8 +104,8 @@ void main() {
         Server(id: 'server1', name: 'Test', host: 'localhost', username: 'user'),
       ];
       when(() => mockServerProvider.servers).thenReturn(testServers);
-      when(() => mockConnectionProvider.isSSHConnected(any())).thenReturn(false);
-      when(() => mockConnectionProvider.isSFTPConnected(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer(any())).thenReturn(false);
 
       await tester.pumpWidget(createServerList(isCollapsed: false));
       await tester.pumpAndSettle();
@@ -118,8 +119,8 @@ void main() {
         Server(id: 'server1', name: 'Test', host: 'localhost', username: 'user'),
       ];
       when(() => mockServerProvider.servers).thenReturn(testServers);
-      when(() => mockConnectionProvider.isSSHConnected(any())).thenReturn(false);
-      when(() => mockConnectionProvider.isSFTPConnected(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer(any())).thenReturn(false);
 
       await tester.pumpWidget(createServerList(isCollapsed: true));
       await tester.pumpAndSettle();
@@ -134,6 +135,75 @@ void main() {
       await tester.pumpWidget(createServerList());
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+
+    testWidgets('renders a flat list with no headers when no server has a group', (tester) async {
+      final testServers = [
+        Server(id: 's1', name: 'Alpha', host: 'h1', username: 'u'),
+        Server(id: 's2', name: 'Beta', host: 'h2', username: 'u'),
+      ];
+      when(() => mockServerProvider.servers).thenReturn(testServers);
+      when(() => mockServerProvider.groups).thenReturn([]);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer(any())).thenReturn(false);
+
+      await tester.pumpWidget(createServerList());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Alpha'), findsOneWidget);
+      expect(find.text('Beta'), findsOneWidget);
+      expect(find.text('UNGROUPED'), findsNothing);
+    });
+
+    testWidgets('groups servers under a header per distinct group, sorted', (tester) async {
+      final prod = Server(id: 's1', name: 'Prod Box', host: 'h1', username: 'u', group: 'Production');
+      final stage = Server(id: 's2', name: 'Stage Box', host: 'h2', username: 'u', group: 'Staging');
+      when(() => mockServerProvider.servers).thenReturn([prod, stage]);
+      when(() => mockServerProvider.groups).thenReturn(['Production', 'Staging']);
+      when(() => mockServerProvider.getServersByGroup('Production')).thenReturn([prod]);
+      when(() => mockServerProvider.getServersByGroup('Staging')).thenReturn([stage]);
+      when(() => mockServerProvider.getServersByGroup(null)).thenReturn([]);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer(any())).thenReturn(false);
+
+      await tester.pumpWidget(createServerList());
+      await tester.pumpAndSettle();
+
+      expect(find.text('PRODUCTION'), findsOneWidget);
+      expect(find.text('STAGING'), findsOneWidget);
+      expect(find.text('Prod Box'), findsOneWidget);
+      expect(find.text('Stage Box'), findsOneWidget);
+      // No "Ungrouped" header when every server has a group.
+      expect(find.text('UNGROUPED'), findsNothing);
+
+      // Production's header must appear before Staging's, matching the
+      // sorted order ServerProvider.groups already guarantees.
+      final productionY = tester.getTopLeft(find.text('PRODUCTION')).dy;
+      final stagingY = tester.getTopLeft(find.text('STAGING')).dy;
+      expect(productionY, lessThan(stagingY));
+    });
+
+    testWidgets('shows an Ungrouped header before named groups when both exist', (tester) async {
+      final loose = Server(id: 's1', name: 'Loose Box', host: 'h1', username: 'u');
+      final grouped = Server(id: 's2', name: 'Grouped Box', host: 'h2', username: 'u', group: 'Team A');
+      when(() => mockServerProvider.servers).thenReturn([loose, grouped]);
+      when(() => mockServerProvider.groups).thenReturn(['Team A']);
+      when(() => mockServerProvider.getServersByGroup('Team A')).thenReturn([grouped]);
+      when(() => mockServerProvider.getServersByGroup(null)).thenReturn([loose]);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer(any())).thenReturn(false);
+
+      await tester.pumpWidget(createServerList());
+      await tester.pumpAndSettle();
+
+      expect(find.text('UNGROUPED'), findsOneWidget);
+      expect(find.text('TEAM A'), findsOneWidget);
+      expect(find.text('Loose Box'), findsOneWidget);
+      expect(find.text('Grouped Box'), findsOneWidget);
+
+      final ungroupedY = tester.getTopLeft(find.text('UNGROUPED')).dy;
+      final teamAY = tester.getTopLeft(find.text('TEAM A')).dy;
+      expect(ungroupedY, lessThan(teamAY));
     });
   });
 
@@ -168,8 +238,8 @@ void main() {
         username: 'admin',
       );
 
-      when(() => mockConnectionProvider.isSSHConnected('test')).thenReturn(false);
-      when(() => mockConnectionProvider.isSFTPConnected('test')).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer('test')).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer('test')).thenReturn(false);
 
       await tester.pumpWidget(createServerTile(server: server, isCollapsed: false));
       await tester.pumpAndSettle();
@@ -187,8 +257,8 @@ void main() {
         username: 'admin',
       );
 
-      when(() => mockConnectionProvider.isSSHConnected('test')).thenReturn(false);
-      when(() => mockConnectionProvider.isSFTPConnected('test')).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer('test')).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer('test')).thenReturn(false);
 
       await tester.pumpWidget(createServerTile(server: server, isCollapsed: true));
       await tester.pumpAndSettle();
@@ -209,8 +279,8 @@ void main() {
         username: 'user',
       );
 
-      when(() => mockConnectionProvider.isSSHConnected('test')).thenReturn(true);
-      when(() => mockConnectionProvider.isSFTPConnected('test')).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer('test')).thenReturn(true);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer('test')).thenReturn(false);
 
       await tester.pumpWidget(createServerTile(server: server, isCollapsed: false));
       await tester.pumpAndSettle();
@@ -226,8 +296,8 @@ void main() {
         username: 'user',
       );
 
-      when(() => mockConnectionProvider.isSSHConnected('test')).thenReturn(false);
-      when(() => mockConnectionProvider.isSFTPConnected('test')).thenReturn(true);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer('test')).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer('test')).thenReturn(true);
 
       await tester.pumpWidget(createServerTile(server: server, isCollapsed: false));
       await tester.pumpAndSettle();
@@ -243,8 +313,8 @@ void main() {
         username: 'user',
       );
 
-      when(() => mockConnectionProvider.isSSHConnected('test')).thenReturn(true);
-      when(() => mockConnectionProvider.isSFTPConnected('test')).thenReturn(true);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer('test')).thenReturn(true);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer('test')).thenReturn(true);
 
       await tester.pumpWidget(createServerTile(server: server, isCollapsed: false));
       await tester.pumpAndSettle();
@@ -262,8 +332,8 @@ void main() {
         username: 'deploy',
       );
 
-      when(() => mockConnectionProvider.isSSHConnected('test')).thenReturn(false);
-      when(() => mockConnectionProvider.isSFTPConnected('test')).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer('test')).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer('test')).thenReturn(false);
 
       await tester.pumpWidget(createServerTile(server: server, isCollapsed: true));
       await tester.pumpAndSettle();
@@ -280,8 +350,8 @@ void main() {
         username: 'user',
       );
 
-      when(() => mockConnectionProvider.isSSHConnected('test')).thenReturn(true);
-      when(() => mockConnectionProvider.isSFTPConnected('test')).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer('test')).thenReturn(true);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer('test')).thenReturn(false);
 
       await tester.pumpWidget(createServerTile(server: server, isCollapsed: true));
       await tester.pumpAndSettle();
@@ -300,8 +370,8 @@ void main() {
         Server(id: 'server1', name: 'Test', host: 'localhost', username: 'user'),
       ];
       when(() => mockServerProvider.servers).thenReturn(testServers);
-      when(() => mockConnectionProvider.isSSHConnected(any())).thenReturn(false);
-      when(() => mockConnectionProvider.isSFTPConnected(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer(any())).thenReturn(false);
 
       // Test expanded state
       final expandedWidget = MaterialApp(

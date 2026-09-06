@@ -112,11 +112,15 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
 
       tabProvider.updateTabPath(widget.tabId, _currentPath);
 
-      final items = await sftpService.listDirectory(_currentPath);
-      
+      final result = await sftpService.listDirectory(_currentPath);
+
       if (mounted) {
         setState(() {
-          _items = items;
+          if (result.success) {
+            _items = result.data ?? [];
+          } else {
+            _error = result.error ?? 'Failed to list directory';
+          }
         });
       }
     } catch (e) {
@@ -183,7 +187,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
       },
     );
 
-    final success = await sftpService.downloadFile(
+    final result = await sftpService.downloadFile(
       remotePath,
       finalLocalPath,
       onProgress: (received, total) {
@@ -192,11 +196,11 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
       checkCancelled: () => isCancelled,
     );
 
-    if (success) {
+    if (result.success) {
       transferProvider.completeTransfer(taskId);
     } else {
       if (!isCancelled) {
-        transferProvider.failTransfer(taskId, 'Download failed');
+        transferProvider.failTransfer(taskId, result.error ?? 'Download failed');
       }
     }
   }
@@ -240,7 +244,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
               },
             );
       
-            final success = await sftpService.uploadFile(
+            final result = await sftpService.uploadFile(
               filePath,
               remotePath,
               onProgress: (sent, total) {
@@ -248,14 +252,14 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
               },
               checkCancelled: () => isCancelled,
             );
-      
-            if (success) {
+
+            if (result.success) {
               transferProvider.completeTransfer(taskId);
             } else {
                if (isCancelled) {
                   // Handled by provider
                } else {
-                  transferProvider.failTransfer(taskId, 'Upload failed');
+                  transferProvider.failTransfer(taskId, result.error ?? 'Upload failed');
                }
             }    }
 
@@ -310,16 +314,16 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
 
     if (sftpService == null) return;
 
-    final success = await sftpService.createDirectory(_getFullPath(name));
+    final result = await sftpService.createDirectory(_getFullPath(name));
 
     if (!mounted) return;
 
-    if (success) {
+    if (result.success) {
       _loadDirectory();
     } else {
       scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text('Failed to create directory'),
+        SnackBar(
+          content: Text(result.error ?? 'Failed to create directory'),
           backgroundColor: AppTheme.errorColor,
         ),
       );
@@ -361,19 +365,19 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
 
     if (sftpService == null) return;
 
-    final success = await sftpService.rename(
+    final result = await sftpService.rename(
       _getFullPath(oldName),
       _getFullPath(newName),
     );
 
     if (!mounted) return;
 
-    if (success) {
+    if (result.success) {
       _loadDirectory();
     } else {
       scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text('Failed to rename'),
+        SnackBar(
+          content: Text(result.error ?? 'Failed to rename'),
           backgroundColor: AppTheme.errorColor,
         ),
       );
@@ -410,19 +414,19 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
 
     if (sftpService == null) return;
 
-    final success = await sftpService.delete(
+    final result = await sftpService.delete(
       _getFullPath(filename),
       isDirectory: isDirectory,
     );
 
     if (!mounted) return;
 
-    if (success) {
+    if (result.success) {
       _loadDirectory();
     } else {
       scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text('Failed to delete'),
+        SnackBar(
+          content: Text(result.error ?? 'Failed to delete'),
           backgroundColor: AppTheme.errorColor,
         ),
       );

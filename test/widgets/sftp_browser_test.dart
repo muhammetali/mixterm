@@ -10,6 +10,7 @@ import 'package:mixterm/providers/tab_provider.dart';
 import 'package:mixterm/providers/transfer_provider.dart';
 import 'package:mixterm/services/sftp_service.dart';
 import 'package:mixterm/models/server.dart';
+import 'package:mixterm/utils/result.dart';
 import 'package:dartssh2/dartssh2.dart';
 
 // Mocks
@@ -82,7 +83,7 @@ void main() {
 
     when(() => mockSFTPService.listDirectory(any())).thenAnswer((_) async {
       await Future.delayed(const Duration(milliseconds: 100)); // Simulate network delay
-      return [mockItem];
+      return Result.ok([mockItem]);
     });
 
     // Act

@@ -12,6 +12,7 @@ import 'package:mixterm/providers/transfer_provider.dart';
 import 'package:mixterm/services/sftp_service.dart';
 import 'package:mixterm/services/storage_service.dart';
 import 'package:mixterm/services/sync_service.dart';
+import 'package:mixterm/utils/result.dart';
 import 'package:mixterm/widgets/sftp_browser.dart';
 import 'package:provider/provider.dart';
 import 'package:dartssh2/dartssh2.dart';
@@ -32,15 +33,15 @@ class MockSFTPService extends SFTPService {
   bool get isConnected => _isConnected;
 
   @override
-  Future<List<SftpName>> listDirectory(String path) async {
+  Future<Result<List<SftpName>>> listDirectory(String path) async {
     debugPrint('Mock (${identityHashCode(this)}): listDirectory called for $path');
     if (delays.containsKey(path)) {
       debugPrint('Mock: waiting for delay on $path');
       final result = await delays[path]!.future;
       debugPrint('Mock: delay finished for $path');
-      if (result.isNotEmpty) return result;
+      if (result.isNotEmpty) return Result.ok(result);
     }
-    return filesystem[path] ?? [];
+    return Result.ok(filesystem[path] ?? []);
   }
 
   @override
@@ -49,8 +50,8 @@ class MockSFTPService extends SFTPService {
   }
 
   @override
-  Future<bool> createDirectory(String path) async {
-    return true;
+  Future<VoidResult> createDirectory(String path) async {
+    return VoidResult.ok();
   }
 }
 

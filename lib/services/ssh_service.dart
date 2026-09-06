@@ -6,6 +6,7 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import '../models/server.dart';
 import '../utils/constants.dart';
+import '../utils/result.dart';
 
 enum SSHConnectionState {
   disconnected,
@@ -14,21 +15,9 @@ enum SSHConnectionState {
   error,
 }
 
-class SSHConnectResult {
-  final bool success;
-  final String? error;
-
-  SSHConnectResult({required this.success, this.error});
-
-  factory SSHConnectResult.ok() => SSHConnectResult(success: true);
-  factory SSHConnectResult.fail(String error) =>
-      SSHConnectResult(success: false, error: error);
-}
-
 class SSHService {
   SSHClient? _client;
   SSHSession? _session;
-  Timer? _keepAliveTimer;
   StreamSubscription<Uint8List>? _stdoutSubscription;
   StreamSubscription<Uint8List>? _stderrSubscription;
   final StreamController<String> _outputController =
@@ -41,7 +30,7 @@ class SSHService {
 
   bool get isConnected => _client != null && !_client!.isClosed;
 
-  Future<SSHConnectResult> connect(Server server) async {
+  Future<VoidResult> connect(Server server) async {
     try {
       _stateController.add(SSHConnectionState.connecting);
       debugPrint('SSH: Connecting to ${server.host}:${server.port}');
@@ -53,19 +42,28 @@ class SSHService {
       );
       debugPrint('SSH: Socket connected');
 
+      // dartssh2's SSHClient sends its own `keepalive@openssh.com` global
+      // request on this interval once authenticated (see SSHKeepAlive),
+      // which is what actually keeps idle sessions alive through
+      // NATs/firewalls. Passed explicitly so the behavior is visible here
+      // rather than relying on the library's implicit default.
+      const keepAliveInterval =
+          Duration(seconds: AppConstants.sshKeepAliveIntervalSeconds);
+
       if (server.authType == AuthType.password) {
         debugPrint('SSH: Using password authentication');
         _client = SSHClient(
           socket,
           username: server.username,
           onPasswordRequest: () => server.password ?? '',
+          keepAliveInterval: keepAliveInterval,
         );
       } else {
         debugPrint('SSH: Using key authentication');
         final privateKey = server.privateKey ?? '';
         if (privateKey.isEmpty) {
           _stateController.add(SSHConnectionState.error);
-          return SSHConnectResult.fail('Private key is empty');
+          return VoidResult.fail('Private key is empty');
         }
 
         debugPrint('SSH: Using private key authentication');
@@ -79,18 +77,19 @@ class SSHService {
 
           if (keyPairs.isEmpty) {
             _stateController.add(SSHConnectionState.error);
-            return SSHConnectResult.fail('Failed to parse private key');
+            return VoidResult.fail('Failed to parse private key');
           }
 
           _client = SSHClient(
             socket,
             username: server.username,
             identities: keyPairs,
+            keepAliveInterval: keepAliveInterval,
           );
         } catch (e) {
           debugPrint('SSH: Key parsing error: $e');
           _stateController.add(SSHConnectionState.error);
-          return SSHConnectResult.fail('Invalid private key format: $e');
+          return VoidResult.fail('Invalid private key format: $e');
         }
       }
 
@@ -115,23 +114,22 @@ class SSHService {
       });
 
       _stateController.add(SSHConnectionState.connected);
-      _startKeepAlive();
-      return SSHConnectResult.ok();
+      return VoidResult.ok();
     } on SocketException catch (e) {
       debugPrint('SSH: Socket error: $e');
       _stateController.add(SSHConnectionState.error);
       _outputController.add('Connection error: $e\n');
-      return SSHConnectResult.fail('Could not connect to ${server.host}:${server.port}');
+      return VoidResult.fail('Could not connect to ${server.host}:${server.port}');
     } on SSHAuthFailError catch (e) {
       debugPrint('SSH: Auth failed: $e');
       _stateController.add(SSHConnectionState.error);
       _outputController.add('Authentication failed: $e\n');
-      return SSHConnectResult.fail('Authentication failed: Invalid credentials');
+      return VoidResult.fail('Authentication failed: Invalid credentials');
     } catch (e) {
       debugPrint('SSH: General error: $e');
       _stateController.add(SSHConnectionState.error);
       _outputController.add('Connection error: $e\n');
-      return SSHConnectResult.fail('$e');
+      return VoidResult.fail('$e');
     }
   }
 
@@ -152,18 +150,7 @@ class SSHService {
     _session?.resizeTerminal(width, height);
   }
 
-  void _startKeepAlive() {
-    _keepAliveTimer?.cancel();
-    _keepAliveTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (isConnected) {
-        // TODO: Find correct method for keep-alive in dartssh2
-        // _client?.sendGlobalRequest('keepalive@openssh.com');
-      }
-    });
-  }
-
   Future<void> disconnect() async {
-    _keepAliveTimer?.cancel();
     await _stdoutSubscription?.cancel();
     await _stderrSubscription?.cancel();
     _stdoutSubscription = null;
@@ -178,7 +165,6 @@ class SSHService {
   }
 
   void dispose() {
-    _keepAliveTimer?.cancel();
     _stdoutSubscription?.cancel();
     _stderrSubscription?.cancel();
     _session?.close();
