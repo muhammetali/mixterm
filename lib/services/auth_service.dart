@@ -13,16 +13,27 @@ class AuthService extends ChangeNotifier {
   // 1. Go to https://console.cloud.google.com/
   // 2. Create a project and enable Google Drive API
   // 3. Create OAuth 2.0 Client ID (Desktop app type)
-  // 4. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables
-  //    or update the defaultValue below
+  // 4. Optionally set GOOGLE_CLIENT_ID via --dart-define, or update the
+  //    defaultValue below
   static const String _clientId = String.fromEnvironment(
     'GOOGLE_CLIENT_ID',
     defaultValue: '449803261214-6p5oc4no7cav8gh7kj4am1qg9elvk55u.apps.googleusercontent.com',
   );
 
-  static const String _clientSecret = String.fromEnvironment(
-    'GOOGLE_CLIENT_SECRET',
-  );
+  // No client secret: Desktop-app OAuth clients are public clients per
+  // Google's own guidance (a secret can't actually be kept confidential in
+  // a distributed binary), and this flow already uses PKCE (see
+  // googleapis_auth's AuthorizationCodeGrantServerFlow/createCodeVerifier)
+  // for security instead. `String.fromEnvironment` returns '' rather than
+  // null when GOOGLE_CLIENT_SECRET isn't provided, and googleapis_auth
+  // only omits `client_secret` from the token request when ClientId.secret
+  // is exactly null (not merely empty) — sending '' reads to Google as
+  // "client_secret is missing" (HTTP 400) instead of "not sent". Route
+  // through this getter so every build (not just ones passing
+  // --dart-define=GOOGLE_CLIENT_SECRET=...) gets the correct, working,
+  // secret-free flow.
+  static const String _clientSecretEnv = String.fromEnvironment('GOOGLE_CLIENT_SECRET');
+  static String? get _clientSecret => _clientSecretEnv.isEmpty ? null : _clientSecretEnv;
 
   static const List<String> _scopes = [
     'email',
@@ -44,8 +55,12 @@ class AuthService extends ChangeNotifier {
   String? get userPhoto => _userPhoto;
   String? get userId => _userId;
 
-  // Client identifier with secret for OAuth
+  // Client identifier for OAuth — see _clientSecret's doc comment for why
+  // this intentionally has no secret unless GOOGLE_CLIENT_SECRET is set.
   final _clientIdentifier = ClientId(_clientId, _clientSecret);
+
+  @visibleForTesting
+  ClientId get debugClientId => _clientIdentifier;
 
   Future<void> init() async {
     try {

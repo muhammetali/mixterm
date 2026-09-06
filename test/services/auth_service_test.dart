@@ -15,6 +15,23 @@ void main() {
       authService = AuthService();
     });
 
+    group('OAuth client configuration', () {
+      test('client secret is null (not empty) when GOOGLE_CLIENT_SECRET is unset', () {
+        // Regression test: googleapis_auth only omits `client_secret` from
+        // the token request when ClientId.secret is exactly null — an
+        // empty string is sent as `client_secret=` and Google's server
+        // rejects it as "invalid_request: client_secret is missing"
+        // (HTTP 400). String.fromEnvironment yields '' rather than null
+        // when the define isn't provided, so AuthService must translate
+        // that itself rather than passing it straight through to ClientId.
+        expect(authService.debugClientId.secret, isNull);
+      });
+
+      test('client id is configured', () {
+        expect(authService.debugClientId.identifier, isNotEmpty);
+      });
+    });
+
     group('initial state', () {
       test('isSignedIn returns false initially', () {
         expect(authService.isSignedIn, isFalse);
