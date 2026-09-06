@@ -50,6 +50,7 @@ void main() {
 
     when(() => mockServerProvider.isLoading).thenReturn(false);
     when(() => mockServerProvider.servers).thenReturn([]);
+    when(() => mockServerProvider.groups).thenReturn([]);
 
     when(() => mockTabProvider.tabs).thenReturn([]);
     when(() => mockTabProvider.activeTabId).thenReturn(null);
@@ -174,8 +175,8 @@ void main() {
         Server(id: 'server1', name: 'Test Server', host: 'localhost', username: 'user'),
       ];
       when(() => mockServerProvider.servers).thenReturn(testServers);
-      when(() => mockConnectionProvider.isSSHConnected(any())).thenReturn(false);
-      when(() => mockConnectionProvider.isSFTPConnected(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer(any())).thenReturn(false);
 
       tester.view.physicalSize = const Size(1280, 720);
       tester.view.devicePixelRatio = 1.0;
@@ -195,8 +196,8 @@ void main() {
         Server(id: 'server1', name: 'Test Server', host: 'localhost', username: 'user'),
       ];
       when(() => mockServerProvider.servers).thenReturn(testServers);
-      when(() => mockConnectionProvider.isSSHConnected(any())).thenReturn(false);
-      when(() => mockConnectionProvider.isSFTPConnected(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer(any())).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer(any())).thenReturn(false);
 
       tester.view.physicalSize = const Size(1280, 720);
       tester.view.devicePixelRatio = 1.0;
@@ -271,8 +272,8 @@ void main() {
         username: 'deploy',
       );
 
-      when(() => mockConnectionProvider.isSSHConnected('test')).thenReturn(false);
-      when(() => mockConnectionProvider.isSFTPConnected('test')).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer('test')).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer('test')).thenReturn(false);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -303,8 +304,8 @@ void main() {
         username: 'deploy',
       );
 
-      when(() => mockConnectionProvider.isSSHConnected('test')).thenReturn(false);
-      when(() => mockConnectionProvider.isSFTPConnected('test')).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer('test')).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer('test')).thenReturn(false);
 
       await tester.pumpWidget(
         MaterialApp(

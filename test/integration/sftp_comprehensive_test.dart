@@ -56,15 +56,19 @@ class MockSFTPService extends SFTPService {
 }
 
 class MockConnectionProvider extends ConnectionProvider {
+  // Keyed by tabId, matching ConnectionProvider's real contract: each tab
+  // gets its own independent connection (see connection_provider.dart's
+  // getSFTPConnection(String tabId)). SFTPBrowser looks this up by
+  // widget.tabId, never by serverId.
   final Map<String, SFTPService> _services = {};
 
-  void setService(String serverId, SFTPService service) {
-    _services[serverId] = service;
+  void setService(String tabId, SFTPService service) {
+    _services[tabId] = service;
   }
 
   @override
-  SFTPService? getSFTPConnection(String serverId) {
-    return _services[serverId];
+  SFTPService? getSFTPConnection(String tabId) {
+    return _services[tabId];
   }
 }
 
@@ -150,7 +154,6 @@ void main() {
     );
 
     mockConnectionProvider = MockConnectionProvider();
-    mockConnectionProvider.setService(serverId, mockSFTPService);
 
     serverProvider = ServerProvider(MockStorageService(), MockSyncService());
     serverProvider.addServer(Server(
@@ -163,10 +166,11 @@ void main() {
 
     tabProvider = TabProvider();
     tabId = tabProvider.addTab(
-      type: TabType.sftp, 
-      serverId: serverId, 
+      type: TabType.sftp,
+      serverId: serverId,
       title: 'Test Tab',
     );
+    mockConnectionProvider.setService(tabId, mockSFTPService);
 
     transferProvider = TransferProvider();
 
@@ -252,6 +256,11 @@ void main() {
      await tester.pump(); 
      await tester.pump(const Duration(milliseconds: 100));
 
+     // Opening a directory requires a double-tap: a single tap only
+     // selects the item (see sftp_browser.dart's onTap/onDoubleTap split,
+     // "tek tıklama seçim, çift tıklama navigasyon").
+     await tester.tap(find.text('folder_a'));
+     await tester.pump(const Duration(milliseconds: 100));
      await tester.tap(find.text('folder_a'));
      await tester.pump();
      await tester.pump(const Duration(milliseconds: 100));

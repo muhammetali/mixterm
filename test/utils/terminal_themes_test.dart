@@ -65,10 +65,14 @@ void main() {
       });
 
       test('returns default theme for unknown name', () {
+        // getTheme falls back to themes.first for an unrecognized name (see
+        // terminal_themes.dart's `orElse: () => themes.first`) — assert
+        // against that same contract rather than a specific theme name, so
+        // this doesn't go stale if the designated default theme changes.
         final unknownTheme = AppTerminalThemes.getTheme('NonExistent Theme');
-        final defaultTheme = AppTerminalThemes.getTheme('Default Dark');
+        final fallbackTheme = AppTerminalThemes.themes.first.theme;
 
-        expect(unknownTheme.foreground, equals(defaultTheme.foreground));
+        expect(unknownTheme.foreground, equals(fallbackTheme.foreground));
       });
 
       test('applies custom foreground color when specified', () {
@@ -153,14 +157,19 @@ void main() {
         }
       });
 
-      test('selection colors provide good contrast', () {
-        // Default Dark theme
-        final defaultDark = AppTerminalThemes.getTheme('Default Dark');
-        expect(defaultDark.selection, equals(const Color(0xFF264F78)));
+      test('dark themes share a semi-transparent white selection overlay for an inverted look', () {
+        // Selection is a uniform Color(0x80FFFFFF) overlay across dark
+        // themes rather than a distinct solid color per theme, by design
+        // (see terminal_themes.dart: "creates inverted look on dark bg").
+        for (final name in ['Default Dark', 'Dracula', 'Solarized Dark', 'Monokai']) {
+          final theme = AppTerminalThemes.getTheme(name);
+          expect(theme.selection, equals(const Color(0x80FFFFFF)), reason: name);
+        }
+      });
 
-        // Dracula theme
-        final dracula = AppTerminalThemes.getTheme('Dracula');
-        expect(dracula.selection, equals(const Color(0xFF44475A)));
+      test('light themes use a semi-transparent black selection overlay', () {
+        final githubLight = AppTerminalThemes.getTheme('GitHub Light');
+        expect(githubLight.selection, equals(const Color(0x80000000)));
       });
     });
 

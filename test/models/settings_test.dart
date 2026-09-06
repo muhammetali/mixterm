@@ -16,7 +16,7 @@ void main() {
         expect(settings.terminalOpacity, equals(1.0));
         expect(settings.showScrollbar, isTrue);
         expect(settings.scrollbackLines, equals(10000));
-        expect(settings.terminalTheme, equals('Default Dark'));
+        expect(settings.terminalTheme, equals('Monokai'));
         expect(settings.sidebarCollapsed, isFalse);
         expect(settings.terminalForegroundColor, equals('Default'));
       });

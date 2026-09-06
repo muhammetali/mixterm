@@ -35,6 +35,7 @@ void main() {
     when(() => mockSettingsProvider.pasteOnRightClick).thenReturn(true);
     when(() => mockSettingsProvider.showScrollbar).thenReturn(true);
     when(() => mockSettingsProvider.fontFamily).thenReturn('JetBrainsMono');
+    when(() => mockSettingsProvider.fontWeight).thenReturn('Normal');
     when(() => mockSettingsProvider.terminalTheme).thenReturn('Default Dark');
     when(() => mockSettingsProvider.terminalForegroundColor).thenReturn('Default');
     when(() => mockSettingsProvider.fontSize).thenReturn(14);
