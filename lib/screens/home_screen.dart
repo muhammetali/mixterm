@@ -11,6 +11,7 @@ import '../widgets/sftp_browser.dart';
 import '../widgets/session_tab_bar.dart';
 import '../widgets/dialogs/add_server_dialog.dart';
 import '../widgets/transfer_indicator.dart';
+import '../utils/design_tokens.dart';
 import '../utils/theme.dart';
 import 'settings_screen.dart';
 
@@ -222,14 +223,14 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.menu, size: 20),
+                  icon: const Icon(Icons.menu, size: AppIconSize.lg),
                   tooltip: 'Expand sidebar',
                   onPressed: () => context.read<SettingsProvider>().toggleSidebar(),
                   constraints: collapsedButtonConstraints,
                   padding: EdgeInsets.zero,
                 ),
                 IconButton(
-                  icon: const Icon(Icons.add, size: 20),
+                  icon: const Icon(Icons.add, size: AppIconSize.lg),
                   tooltip: 'Add server',
                   onPressed: _showAddServerDialog,
                   constraints: collapsedButtonConstraints,
@@ -239,8 +240,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   builder: (context, auth, _) {
                     return IconButton(
                       icon: Icon(
-                        auth.isSignedIn ? Icons.cloud_done : Icons.cloud_off,
-                        size: 20,
+                        auth.isSignedIn
+                            ? Icons.cloud_done_outlined
+                            : Icons.cloud_off_outlined,
+                        size: AppIconSize.lg,
                       ),
                       tooltip: auth.isSignedIn ? 'Sync' : 'Sign in',
                       onPressed: _syncData,
@@ -250,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
                 IconButton(
-                  icon: const Icon(Icons.settings, size: 20),
+                  icon: const Icon(Icons.settings_outlined, size: AppIconSize.lg),
                   tooltip: 'Settings',
                   onPressed: _openSettings,
                   constraints: collapsedButtonConstraints,
@@ -261,27 +264,23 @@ class _HomeScreenState extends State<HomeScreen> {
           : Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.menu_open, size: 20),
+                  icon: const Icon(Icons.menu_open, size: AppIconSize.lg),
                   tooltip: 'Collapse sidebar',
                   onPressed: () => context.read<SettingsProvider>().toggleSidebar(),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: AppSpacing.xs),
                 const Icon(
                   Icons.terminal,
-                  color: AppTheme.primaryColor,
-                  size: 24,
+                  color: AppColors.accent,
+                  size: AppIconSize.lg,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: AppSpacing.sm),
                 const Expanded(
                   child: Text(
                     'MixTerm',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textColor,
-                    ),
+                    style: AppTypography.title,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -289,8 +288,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   builder: (context, auth, _) {
                     return IconButton(
                       icon: Icon(
-                        auth.isSignedIn ? Icons.cloud_done : Icons.cloud_off,
-                        size: 20,
+                        auth.isSignedIn
+                            ? Icons.cloud_done_outlined
+                            : Icons.cloud_off_outlined,
+                        size: AppIconSize.lg,
                       ),
                       tooltip: auth.isSignedIn ? 'Sync to cloud' : 'Sign in to sync',
                       onPressed: _syncData,
@@ -298,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
                 IconButton(
-                  icon: const Icon(Icons.settings, size: 20),
+                  icon: const Icon(Icons.settings_outlined, size: AppIconSize.lg),
                   tooltip: 'Settings',
                   onPressed: _openSettings,
                 ),
@@ -312,25 +313,29 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.dns_outlined,
-            size: 64,
-            color: AppTheme.textSecondary.withValues(alpha: 0.5),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No active connection',
-            style: TextStyle(
-              fontSize: 18,
-              color: AppTheme.textSecondary.withValues(alpha: 0.8),
+          // Empty states are the screen's hero when they are showing, so
+          // the glyph gets a surface of its own rather than floating as a
+          // bare grey shape on the terminal ground.
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: AppColors.panel,
+              borderRadius: AppRadius.lgAll,
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Icon(
+              Icons.dns_outlined,
+              size: AppIconSize.display,
+              color: AppColors.textTertiary,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
+          SizedBox(height: AppSpacing.xl),
+          const Text('No active connection', style: AppTypography.title),
+          SizedBox(height: AppSpacing.xs),
+          const Text(
             'Select a server from the list to connect',
-            style: TextStyle(
-              color: AppTheme.textSecondary.withValues(alpha: 0.6),
-            ),
+            style: AppTypography.secondary,
           ),
         ],
       ),

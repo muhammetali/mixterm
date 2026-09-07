@@ -549,7 +549,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.folder, size: 18, color: AppTheme.primaryColor),
+          const Icon(Icons.folder_outlined, size: 18, color: AppTheme.primaryColor),
           const SizedBox(width: 8),
           Text(
             '$title - SFTP',
@@ -685,7 +685,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
               ),
               const SizedBox(height: 24),
             ],
-            const Icon(Icons.error, size: 48, color: AppTheme.errorColor),
+            const Icon(Icons.error_outline, size: 48, color: AppTheme.errorColor),
             const SizedBox(height: 16),
             Text(_error!, style: const TextStyle(color: AppTheme.errorColor)),
             const SizedBox(height: 16),
@@ -753,7 +753,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                isDir ? Icons.folder : Icons.insert_drive_file,
+                isDir ? Icons.folder_outlined : Icons.insert_drive_file,
                 size: 16,
                 color: Colors.white,
               ),
@@ -802,7 +802,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
           child: Row(
             children: [
               Icon(
-                isDir ? Icons.folder : _getFileIcon(filename),
+                isDir ? Icons.folder_outlined : _getFileIcon(filename),
                 size: 20,
                 color: isDir ? AppTheme.primaryColor : AppTheme.textSecondary,
               ),

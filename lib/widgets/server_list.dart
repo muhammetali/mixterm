@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/server.dart';
 import '../providers/server_provider.dart';
-import '../utils/theme.dart';
+import '../utils/design_tokens.dart';
 import 'server_tile.dart';
 
 /// Marker row used by [ServerList]'s flattened, groupable list; never
@@ -99,14 +99,17 @@ class ServerList extends StatelessWidget {
 
   Widget _buildGroupHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.lg,
+        AppSpacing.xs,
+      ),
       child: Text(
         title.toUpperCase(),
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
-          color: AppTheme.textSecondary.withValues(alpha: 0.7),
+        style: AppTypography.caption.copyWith(
+          color: AppColors.textTertiary,
+          letterSpacing: 0.6,
         ),
       ),
     );
@@ -127,35 +130,37 @@ class ServerList extends StatelessWidget {
 
   Widget _buildSearchAndAdd(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(8),
+      padding: EdgeInsets.all(AppSpacing.sm),
       child: Row(
         children: [
           Expanded(
             child: SizedBox(
-              height: 36,
+              height: 34,
               child: TextField(
                 decoration: InputDecoration(
                   hintText: 'Search servers...',
-                  prefixIcon: const Icon(Icons.search, size: 18),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    borderSide: const BorderSide(color: AppTheme.borderColor),
+                  prefixIcon: const Icon(Icons.search, size: AppIconSize.md),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 34,
+                    minHeight: 34,
+                  ),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
                   ),
                 ),
-                style: const TextStyle(fontSize: 13),
+                style: AppTypography.body,
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppSpacing.sm),
           SizedBox(
-            height: 36,
+            height: 34,
             child: ElevatedButton.icon(
               onPressed: onAddServer,
-              icon: const Icon(Icons.add, size: 18),
+              icon: const Icon(Icons.add, size: AppIconSize.md),
               label: const Text('Add'),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
               ),
             ),
           ),
@@ -171,20 +176,20 @@ class ServerList extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               Icons.dns_outlined,
-              size: 24,
-              color: AppTheme.textSecondary.withValues(alpha: 0.5),
+              size: AppIconSize.lg,
+              color: AppColors.textTertiary,
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: AppSpacing.sm),
             Tooltip(
               message: 'Add Server',
               child: IconButton(
                 onPressed: onAddServer,
-                icon: const Icon(Icons.add, size: 20),
+                icon: const Icon(Icons.add, size: AppIconSize.lg),
                 style: IconButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.onAccent,
                 ),
               ),
             ),
@@ -198,22 +203,34 @@ class ServerList extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.dns_outlined,
-            size: 48,
-            color: AppTheme.textSecondary.withValues(alpha: 0.5),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No servers yet',
-            style: TextStyle(
-              color: AppTheme.textSecondary.withValues(alpha: 0.8),
+          // The illustration is the one place an icon is the subject
+          // rather than a label, so it gets its own well instead of
+          // floating as a bare grey glyph.
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.raised,
+              borderRadius: AppRadius.lgAll,
+            ),
+            child: const Icon(
+              Icons.dns_outlined,
+              size: AppIconSize.display,
+              color: AppColors.textTertiary,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: AppSpacing.lg),
+          Text('No servers yet', style: AppTypography.bodyStrong),
+          SizedBox(height: AppSpacing.xs),
+          Text(
+            'Add one to get started',
+            style: AppTypography.secondary,
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: AppSpacing.lg),
           ElevatedButton.icon(
             onPressed: onAddServer,
-            icon: const Icon(Icons.add, size: 18),
+            icon: const Icon(Icons.add, size: AppIconSize.md),
             label: const Text('Add Server'),
           ),
         ],

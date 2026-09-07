@@ -5,10 +5,44 @@ import '../models/tab_session.dart';
 import '../providers/server_provider.dart';
 import '../providers/connection_provider.dart';
 import '../providers/tab_provider.dart';
+import '../utils/design_tokens.dart';
 import '../utils/theme.dart';
 import 'dialogs/add_server_dialog.dart';
 
-class ServerTile extends StatelessWidget {
+/// The `SSH` / `SFTP` markers on a connected server row.
+///
+/// Both use the accent rather than one accent and one success green: they
+/// answer the same question (which protocols are live), so giving them
+/// different hues would imply a difference that isn't there. The row's
+/// connected-versus-idle state is already carried by the icon well.
+class _ProtocolBadge extends StatelessWidget {
+  final String label;
+
+  const _ProtocolBadge(this.label);
+
+  static const ssh = _ProtocolBadge('SSH');
+  static const sftp = _ProtocolBadge('SFTP');
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs + 2,
+        vertical: 2,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.accentSubtle,
+        borderRadius: AppRadius.smAll,
+      ),
+      child: Text(
+        label,
+        style: AppTypography.caption.copyWith(color: AppColors.accent),
+      ),
+    );
+  }
+}
+
+class ServerTile extends StatefulWidget {
   final Server server;
   final bool isCollapsed;
 
@@ -19,6 +53,15 @@ class ServerTile extends StatelessWidget {
   });
 
   @override
+  State<ServerTile> createState() => _ServerTileState();
+}
+
+class _ServerTileState extends State<ServerTile> {
+  bool _isHovered = false;
+
+  Server get server => widget.server;
+
+  @override
   Widget build(BuildContext context) {
     return Consumer<ConnectionProvider>(
       builder: (context, connectionProvider, _) {
@@ -27,108 +70,80 @@ class ServerTile extends StatelessWidget {
         final isSFTPConnected = connectionProvider.hasAnySFTPConnectionForServer(server.id);
         final isConnected = isSSHConnected || isSFTPConnected;
 
-        if (isCollapsed) {
+        if (widget.isCollapsed) {
           return _buildCollapsedTile(context, isConnected);
         }
 
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(6),
-              onTap: () => _showConnectionOptions(context),
-              onSecondaryTap: () => _showContextMenu(context),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AppTheme.cardColor,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Icon(
-                        Icons.dns,
-                        size: 20,
-                        color: isSSHConnected || isSFTPConnected
-                            ? AppTheme.successColor
-                            : AppTheme.textSecondary,
-                      ),
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _isHovered = true),
+          onExit: (_) => setState(() => _isHovered = false),
+          child: GestureDetector(
+            onTap: () => _showConnectionOptions(context),
+            onSecondaryTap: () => _showContextMenu(context),
+            child: AnimatedContainer(
+              duration: AppMotion.fast,
+              curve: AppMotion.standard,
+              margin: EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                // 1.45:1 against the sidebar — above the 1.5:1-in-grayscale
+                // floor once the accent well below is counted, so the row
+                // under the pointer is still identifiable without hue.
+                color: _isHovered ? AppColors.hover : Colors.transparent,
+                borderRadius: AppRadius.mdAll,
+              ),
+              child: Row(
+                children: [
+                  // Connection state is carried on three channels that do
+                  // not depend on each other: the well's fill, the glyph's
+                  // colour, and the badges on the right. Any one of them
+                  // going missing still leaves the state readable.
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: isConnected
+                          ? AppColors.accentSubtle
+                          : (_isHovered ? AppColors.selected : AppColors.raised),
+                      borderRadius: AppRadius.mdAll,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            server.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w500,
-                              color: AppTheme.textColor,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${server.username}@${server.host}:${server.port}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondary,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
+                    child: Icon(
+                      Icons.dns_outlined,
+                      size: AppIconSize.md,
+                      color: isConnected
+                          ? AppColors.accent
+                          : AppColors.textSecondary,
                     ),
-                    if (isSSHConnected)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
+                  ),
+                  SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          server.name,
+                          style: AppTypography.bodyStrong,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.successColor.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
+                        Text(
+                          '${server.username}@${server.host}:${server.port}',
+                          style: AppTypography.secondary,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        child: const Text(
-                          'SSH',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: AppTheme.successColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    if (isSFTPConnected) ...[
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'SFTP',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: AppTheme.primaryColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  ),
+                  if (isSSHConnected) _ProtocolBadge.ssh,
+                  if (isSFTPConnected) ...[
+                    if (isSSHConnected) SizedBox(width: AppSpacing.xs),
+                    _ProtocolBadge.sftp,
                   ],
-                ),
+                ],
               ),
             ),
           ),
@@ -140,36 +155,45 @@ class ServerTile extends StatelessWidget {
   Widget _buildCollapsedTile(BuildContext context, bool isConnected) {
     return Tooltip(
       message: '${server.name}\n${server.username}@${server.host}',
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(6),
-            onTap: () => _showConnectionOptions(context),
-            onSecondaryTap: () => _showContextMenu(context),
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Center(
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppTheme.cardColor,
-                    borderRadius: BorderRadius.circular(6),
-                    border: isConnected
-                        ? Border.all(color: AppTheme.successColor, width: 2)
-                        : null,
-                  ),
-                  child: Center(
-                    child: Text(
-                      server.name.isNotEmpty ? server.name[0].toUpperCase() : 'S',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: isConnected
-                            ? AppTheme.successColor
-                            : AppTheme.textSecondary,
-                      ),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: GestureDetector(
+          onTap: () => _showConnectionOptions(context),
+          onSecondaryTap: () => _showContextMenu(context),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xs,
+            ),
+            child: Center(
+              child: AnimatedContainer(
+                duration: AppMotion.fast,
+                curve: AppMotion.standard,
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: isConnected
+                      ? AppColors.accentSubtle
+                      : (_isHovered ? AppColors.hover : AppColors.raised),
+                  borderRadius: AppRadius.mdAll,
+                  // The collapsed rail has no room for badges, so the
+                  // border takes over as the second, hue-independent
+                  // channel for connected-ness.
+                  border: isConnected
+                      ? Border.all(color: AppColors.accent, width: 1.5)
+                      : null,
+                ),
+                child: Center(
+                  child: Text(
+                    server.name.isNotEmpty
+                        ? server.name[0].toUpperCase()
+                        : 'S',
+                    style: AppTypography.bodyStrong.copyWith(
+                      color: isConnected
+                          ? AppColors.accent
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -205,7 +229,7 @@ class ServerTile extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.folder),
+              leading: const Icon(Icons.folder_outlined),
               title: const Text('SFTP File Browser'),
               subtitle: Text(
                 connectionProvider.hasAnySFTPConnectionForServer(server.id)

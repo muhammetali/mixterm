@@ -454,7 +454,7 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
         );
      }
      return Icon(
-       isConnected ? Icons.check_circle : Icons.error,
+       isConnected ? Icons.check_circle : Icons.error_outline,
        size: 16,
        color: isConnected ? AppTheme.successColor : AppTheme.errorColor,
      );

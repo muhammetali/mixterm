@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/connection_provider.dart';
-import 'providers/tab_provider.dart';
 import 'screens/home_screen.dart';
 import 'services/storage_service.dart';
 import 'services/auth_service.dart';

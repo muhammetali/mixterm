@@ -193,7 +193,7 @@ class _TabItem extends StatelessWidget {
       case TabType.ssh:
         return Icons.terminal;
       case TabType.sftp:
-        return Icons.folder;
+        return Icons.folder_outlined;
     }
   }
 

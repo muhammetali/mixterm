@@ -388,7 +388,7 @@ class _GoogleAccountTileState extends State<_GoogleAccountTile> {
                       ? NetworkImage(auth.userPhoto!)
                       : null,
                   child: auth.userPhoto == null
-                      ? const Icon(Icons.person)
+                      ? const Icon(Icons.person_outline)
                       : null,
                 ),
                 title: Text(auth.userName ?? 'Unknown'),
@@ -435,7 +435,7 @@ class _GoogleAccountTileState extends State<_GoogleAccountTile> {
         }
 
         return ListTile(
-          leading: const Icon(Icons.cloud_off),
+          leading: const Icon(Icons.cloud_off_outlined),
           title: const Text('Not signed in'),
           subtitle: const Text('Sign in to sync servers across devices'),
           trailing: _isLoading

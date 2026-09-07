@@ -1,140 +1,261 @@
 import 'package:flutter/material.dart';
 
-class AppTheme {
-  static const Color primaryColor = Color(0xFF00D4AA);
-  static const Color secondaryColor = Color(0xFF7C3AED);
-  static const Color backgroundColor = Color(0xFF0D1117);
-  static const Color surfaceColor = Color(0xFF161B22);
-  static const Color cardColor = Color(0xFF21262D);
-  static const Color borderColor = Color(0xFF30363D);
-  static const Color textColor = Color(0xFFE6EDF3);
-  static const Color textSecondary = Color(0xFF8B949E);
-  static const Color errorColor = Color(0xFFF85149);
-  static const Color successColor = Color(0xFF3FB950);
-  static const Color warningColor = Color(0xFFD29922);
+import 'design_tokens.dart';
 
-  static const Color terminalBackground = Color(0xFF0D1117);
-  static const Color terminalForeground = Color(0xFFE6EDF3);
-  static const Color terminalCursor = Color(0xFF00D4AA);
-  static const Color terminalSelection = Color.fromRGBO(38, 79, 120, 0.5);
+/// Flutter theme assembled from [AppColors] and its sibling token classes.
+///
+/// Every constant here forwards to a token — see `design_tokens.dart` for
+/// where each value comes from and why. Nothing in this file should invent
+/// a number.
+class AppTheme {
+  AppTheme._();
+
+  // Names kept from the previous theme so widgets that have not been
+  // migrated to the token classes still pick up the corrected ramp.
+  static const Color primaryColor = AppColors.accent;
+  static const Color backgroundColor = AppColors.bg;
+  static const Color surfaceColor = AppColors.panel;
+  static const Color cardColor = AppColors.raised;
+  static const Color borderColor = AppColors.border;
+  static const Color textColor = AppColors.textPrimary;
+  static const Color textSecondary = AppColors.textSecondary;
+  static const Color errorColor = AppColors.danger;
+  static const Color successColor = AppColors.success;
+  static const Color warningColor = AppColors.warning;
+
+  static const Color terminalBackground = AppColors.terminalBackground;
+  static const Color terminalForeground = AppColors.terminalForeground;
+  static const Color terminalCursor = AppColors.terminalCursor;
+  static const Color terminalSelection = AppColors.terminalSelection;
 
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      primaryColor: primaryColor,
-      scaffoldBackgroundColor: backgroundColor,
+      primaryColor: AppColors.accent,
+      scaffoldBackgroundColor: AppColors.bg,
       colorScheme: const ColorScheme.dark(
-        primary: primaryColor,
-        secondary: secondaryColor,
-        surface: surfaceColor,
-        error: errorColor,
-        onPrimary: Colors.black,
-        onSecondary: Colors.white,
-        onSurface: textColor,
-        onError: Colors.white,
+        primary: AppColors.accent,
+        // The palette this replaces carried a purple secondary 94° away
+        // from the accent, which gave the interface two competing brand
+        // hues and no rule for when to use which. Secondary now resolves to
+        // the accent, so a component that reaches for it stays on-brand.
+        secondary: AppColors.accent,
+        surface: AppColors.panel,
+        surfaceContainerHighest: AppColors.raised,
+        outline: AppColors.border,
+        error: AppColors.danger,
+        onPrimary: AppColors.onAccent,
+        onSecondary: AppColors.onAccent,
+        onSurface: AppColors.textPrimary,
+        onSurfaceVariant: AppColors.textSecondary,
+        onError: AppColors.onAccent,
       ),
+
+      // Material's ripple is an Android idiom. On desktop the expected
+      // feedback is a pointer-over tint, which the widgets provide
+      // themselves, so the ripple is removed rather than left to fight it.
+      splashFactory: NoSplash.splashFactory,
+      highlightColor: Colors.transparent,
+      hoverColor: AppColors.hover,
+
       appBarTheme: const AppBarTheme(
-        backgroundColor: surfaceColor,
-        foregroundColor: textColor,
+        backgroundColor: AppColors.panel,
+        foregroundColor: AppColors.textPrimary,
         elevation: 0,
         centerTitle: false,
+        titleTextStyle: AppTypography.title,
       ),
-      cardTheme: const CardThemeData(
-        color: cardColor,
+
+      cardTheme: CardThemeData(
+        color: AppColors.raised,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(8)),
-          side: BorderSide(color: borderColor, width: 1),
+          borderRadius: AppRadius.mdAll,
+          side: const BorderSide(color: AppColors.border, width: 1),
         ),
       ),
+
       elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primaryColor,
-          foregroundColor: Colors.black,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
+        style: ButtonStyle(
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) {
+              return AppColors.accentPressed;
+            }
+            return AppColors.accent;
+          }),
+          foregroundColor: const WidgetStatePropertyAll(AppColors.onAccent),
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+          elevation: const WidgetStatePropertyAll(0),
+          textStyle: const WidgetStatePropertyAll(AppTypography.bodyStrong),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: WidgetStatePropertyAll(
+            EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+          ),
         ),
       ),
+
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: textColor,
-          side: const BorderSide(color: borderColor),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
+        style: ButtonStyle(
+          foregroundColor: const WidgetStatePropertyAll(AppColors.textPrimary),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) return AppColors.selected;
+            if (states.contains(WidgetState.hovered)) return AppColors.hover;
+            return Colors.transparent;
+          }),
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+          side: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.hovered)) {
+              return const BorderSide(color: AppColors.borderStrong);
+            }
+            return const BorderSide(color: AppColors.border);
+          }),
+          textStyle: const WidgetStatePropertyAll(AppTypography.bodyStrong),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: WidgetStatePropertyAll(
+            EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+          ),
         ),
       ),
+
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: primaryColor,
+        style: ButtonStyle(
+          foregroundColor: const WidgetStatePropertyAll(AppColors.accent),
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.hovered)) {
+              return AppColors.accentSubtle;
+            }
+            return Colors.transparent;
+          }),
+          textStyle: const WidgetStatePropertyAll(AppTypography.bodyStrong),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
+          ),
         ),
       ),
+
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: cardColor,
+        fillColor: AppColors.raised,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: const BorderSide(color: borderColor),
+          borderRadius: AppRadius.mdAll,
+          borderSide: const BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: const BorderSide(color: borderColor),
+          borderRadius: AppRadius.mdAll,
+          borderSide: const BorderSide(color: AppColors.border),
         ),
+        // A focused field is the one place the accent appears as an outline;
+        // 1.5px rather than 1px so focus survives with hue stripped out.
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: const BorderSide(color: primaryColor),
+          borderRadius: AppRadius.mdAll,
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: const BorderSide(color: errorColor),
+          borderRadius: AppRadius.mdAll,
+          borderSide: const BorderSide(color: AppColors.danger),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        hintStyle: const TextStyle(color: textSecondary),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: AppRadius.mdAll,
+          borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+        ),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.md,
+        ),
+        hintStyle: AppTypography.body.copyWith(color: AppColors.textTertiary),
+        labelStyle: AppTypography.label,
       ),
+
       dividerTheme: const DividerThemeData(
-        color: borderColor,
+        color: AppColors.border,
         thickness: 1,
+        space: 1,
       ),
+
       iconTheme: const IconThemeData(
-        color: textSecondary,
+        color: AppColors.textSecondary,
+        size: AppIconSize.md,
       ),
+
       listTileTheme: const ListTileThemeData(
-        textColor: textColor,
-        iconColor: textSecondary,
+        textColor: AppColors.textPrimary,
+        iconColor: AppColors.textSecondary,
       ),
+
       dialogTheme: DialogThemeData(
-        backgroundColor: surfaceColor,
+        backgroundColor: AppColors.panel,
+        elevation: 0,
+        titleTextStyle: AppTypography.title,
+        contentTextStyle: AppTypography.body,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: borderColor),
+          borderRadius: AppRadius.lgAll,
+          side: const BorderSide(color: AppColors.border),
         ),
       ),
+
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: cardColor,
-        contentTextStyle: const TextStyle(color: textColor),
+        backgroundColor: AppColors.raised,
+        contentTextStyle: AppTypography.body,
+        elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppRadius.mdAll,
+          side: const BorderSide(color: AppColors.border),
         ),
         behavior: SnackBarBehavior.floating,
       ),
+
       popupMenuTheme: PopupMenuThemeData(
-        color: surfaceColor,
+        color: AppColors.panel,
+        elevation: 0,
+        textStyle: AppTypography.body,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: const BorderSide(color: borderColor),
+          borderRadius: AppRadius.lgAll,
+          side: const BorderSide(color: AppColors.border),
         ),
       ),
+
       tooltipTheme: TooltipThemeData(
+        waitDuration: const Duration(milliseconds: 500),
         decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: borderColor),
+          color: AppColors.raised,
+          borderRadius: AppRadius.smAll,
+          border: Border.all(color: AppColors.border),
         ),
-        textStyle: const TextStyle(color: textColor),
+        textStyle: AppTypography.label.copyWith(color: AppColors.textPrimary),
+      ),
+
+      scrollbarTheme: ScrollbarThemeData(
+        thickness: const WidgetStatePropertyAll(8),
+        radius: const Radius.circular(AppRadius.sm),
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.hovered)) {
+            return AppColors.borderStrong;
+          }
+          return AppColors.border;
+        }),
+      ),
+
+      textTheme: const TextTheme(
+        titleLarge: AppTypography.display,
+        titleMedium: AppTypography.title,
+        bodyLarge: AppTypography.body,
+        bodyMedium: AppTypography.body,
+        bodySmall: AppTypography.secondary,
+        labelLarge: AppTypography.bodyStrong,
+        labelMedium: AppTypography.label,
+        labelSmall: AppTypography.caption,
       ),
     );
   }
