@@ -1,5 +1,5 @@
-import 'status_message.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -12,6 +12,7 @@ import '../providers/tab_provider.dart';
 import '../providers/transfer_provider.dart';
 import '../services/sftp_service.dart';
 import '../utils/design_tokens.dart';
+import 'status_message.dart';
 
 class SFTPBrowser extends StatefulWidget {
   final String serverId;
@@ -36,6 +37,22 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
   bool _isFetching = false;
   SFTPService? _sftpService;
   String? _selectedItem; // Currently selected file/folder name
+
+  /// When true the path bar shows the full path as editable, selectable
+  /// text instead of breadcrumb segments. Breadcrumbs are quicker to
+  /// navigate with but you cannot select text out of them, and a path is
+  /// something people copy constantly — into an scp command, a message, a
+  /// config file. Both modes exist because they answer different needs.
+  bool _isEditingPath = false;
+  final TextEditingController _pathController = TextEditingController();
+  final FocusNode _pathFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _pathController.dispose();
+    _pathFocusNode.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -608,17 +625,36 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     );
   }
 
-  Widget _buildPathBar() {
-    final parts = _currentPath.split('/').where((p) => p.isNotEmpty).toList();
+  void _beginEditingPath() {
+    _pathController.text = _currentPath;
+    _pathController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _currentPath.length,
+    );
+    setState(() => _isEditingPath = true);
+    _pathFocusNode.requestFocus();
+  }
 
+  void _commitEditedPath() {
+    final typed = _pathController.text.trim();
+    setState(() => _isEditingPath = false);
+    if (typed.isEmpty || typed == _currentPath) return;
+    _navigateTo(typed.startsWith('/') ? typed : '/$typed');
+  }
+
+  Future<void> _copyCurrentPath() async {
+    await Clipboard.setData(ClipboardData(text: _currentPath));
+    if (!mounted) return;
+    showStatusMessage(context, 'Path copied', kind: StatusKind.success);
+  }
+
+  Widget _buildPathBar() {
     return Container(
       height: 36,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
       decoration: const BoxDecoration(
         color: AppColors.raised,
-        border: Border(
-          bottom: BorderSide(color: AppColors.border),
-        ),
+        border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(
         children: [
@@ -631,44 +667,106 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
           ),
           SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  InkWell(
-                    onTap: () => _navigateTo('/'),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        '/',
-                        style: TextStyle(color: AppColors.accent),
-                      ),
-                    ),
-                  ),
-                  for (var i = 0; i < parts.length; i++) ...[
-                    const Text(' / ', style: TextStyle(color: AppColors.textSecondary)),
-                    InkWell(
-                      onTap: () {
-                        final path = '/${parts.sublist(0, i + 1).join('/')}';
-                        _navigateTo(path);
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          parts[i],
-                          style: TextStyle(
-                            color: i == parts.length - 1
-                                ? AppColors.textPrimary
-                                : AppColors.accent,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+            child: _isEditingPath ? _buildPathField() : _buildBreadcrumb(),
+          ),
+          SizedBox(width: AppSpacing.sm),
+          IconButton(
+            icon: Icon(
+              _isEditingPath ? Icons.check : Icons.edit_outlined,
+              size: AppIconSize.md,
+            ),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32),
+            onPressed: _isEditingPath ? _commitEditedPath : _beginEditingPath,
+            tooltip: _isEditingPath ? 'Go to path' : 'Edit path',
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy_outlined, size: AppIconSize.md),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32),
+            onPressed: _copyCurrentPath,
+            tooltip: 'Copy path',
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The full path as selectable, editable text. Enter navigates, Escape
+  /// puts the breadcrumb back.
+  Widget _buildPathField() {
+    return Shortcuts(
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.escape): DismissIntent(),
+      },
+      child: Actions(
+        actions: {
+          DismissIntent: CallbackAction<DismissIntent>(
+            onInvoke: (_) {
+              setState(() => _isEditingPath = false);
+              return null;
+            },
+          ),
+        },
+        child: TextField(
+          controller: _pathController,
+          focusNode: _pathFocusNode,
+          style: AppTypography.body,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: AppColors.bg,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xs + 2,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: AppRadius.smAll,
+              borderSide: const BorderSide(color: AppColors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: AppRadius.smAll,
+              borderSide: const BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: AppRadius.smAll,
+              borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
             ),
           ),
+          onSubmitted: (_) => _commitEditedPath(),
+        ),
+      ),
+    );
+  }
+
+  /// Clickable path segments.
+  ///
+  /// The leading `/` is the root segment *and* the separator before the
+  /// first name — emitting both is what produced the doubled `/ /` at the
+  /// start of every path.
+  Widget _buildBreadcrumb() {
+    final entries = breadcrumbSegments(_currentPath);
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var i = 0; i < entries.length; i++) ...[
+            // Root already reads as a separator, so one is only needed
+            // between the names that follow it.
+            if (i > 1)
+              Text(
+                '/',
+                style: AppTypography.body.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            _BreadcrumbSegment(
+              label: entries[i].label,
+              isCurrent: i == entries.length - 1,
+              onTap: () => _navigateTo(entries[i].path),
+            ),
+          ],
         ],
       ),
     );
@@ -1063,5 +1161,100 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+}
+
+
+/// One entry in the breadcrumb: what to show, and where clicking it goes.
+class BreadcrumbEntry {
+  final String label;
+  final String path;
+
+  const BreadcrumbEntry(this.label, this.path);
+
+  @override
+  bool operator ==(Object other) =>
+      other is BreadcrumbEntry && other.label == label && other.path == path;
+
+  @override
+  int get hashCode => Object.hash(label, path);
+
+  @override
+  String toString() => 'BreadcrumbEntry($label -> $path)';
+}
+
+/// Splits an absolute path into the segments the path bar renders.
+///
+/// The first entry is always root. It is both the root segment *and* the
+/// separator before the first name, which is what the original version got
+/// wrong: it emitted a `/` for root and then another `/` before every
+/// name including the first, so every path opened with a doubled `/ /`.
+List<BreadcrumbEntry> breadcrumbSegments(String path) {
+  final parts = path.split('/').where((p) => p.isNotEmpty).toList();
+  final entries = <BreadcrumbEntry>[const BreadcrumbEntry('/', '/')];
+  for (var i = 0; i < parts.length; i++) {
+    entries.add(
+      BreadcrumbEntry(parts[i], '/${parts.sublist(0, i + 1).join('/')}'),
+    );
+  }
+  return entries;
+}
+
+/// One clickable segment of the path bar.
+///
+/// The current directory is not a link — it is where you already are — so it
+/// gets the primary text colour and no pointer affordance, while its
+/// ancestors read as the links they are.
+class _BreadcrumbSegment extends StatefulWidget {
+  final String label;
+  final bool isCurrent;
+  final VoidCallback onTap;
+
+  const _BreadcrumbSegment({
+    required this.label,
+    required this.isCurrent,
+    required this.onTap,
+  });
+
+  @override
+  State<_BreadcrumbSegment> createState() => _BreadcrumbSegmentState();
+}
+
+class _BreadcrumbSegmentState extends State<_BreadcrumbSegment> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs + 2,
+        vertical: 2,
+      ),
+      child: Text(
+        widget.label,
+        style: AppTypography.body.copyWith(
+          color: widget.isCurrent ? AppColors.textPrimary : AppColors.accent,
+          fontWeight: widget.isCurrent ? FontWeight.w500 : FontWeight.w400,
+        ),
+      ),
+    );
+
+    if (widget.isCurrent) return text;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: _isHovered ? AppColors.hover : Colors.transparent,
+            borderRadius: AppRadius.smAll,
+          ),
+          child: text,
+        ),
+      ),
+    );
   }
 }
