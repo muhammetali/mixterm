@@ -345,8 +345,14 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
       children: [
         _buildToolbar(server?.name ?? 'Terminal'),
         Expanded(
-          child: Stack(
-            children: [
+          // TerminalView paints its rows without clipping them to its own
+          // box, so a row only partly scrolled into view carries on painting
+          // past the top edge and lands on the toolbar above — which showed
+          // up as terminal text with the toolbar's bottom border struck
+          // through it. This bounds the paint to the area the terminal owns.
+          child: ClipRect(
+            child: Stack(
+              children: [
               KeyboardListener(
                 focusNode: FocusNode(),
                 onKeyEvent: _handleKeyEvent,
@@ -386,6 +392,7 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
               if (_connectionStatus != ConnectionStatus.connected)
                 _buildConnectionOverlay(server),
             ],
+            ),
           ),
         ),
       ],

@@ -1,3 +1,4 @@
+import '../widgets/status_message.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/tab_session.dart';
@@ -63,8 +64,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (result == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Server added successfully')),
+      showStatusMessage(
+        context,
+        'Server added',
+        kind: StatusKind.success,
       );
     }
   }
@@ -84,8 +87,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!authService.isSignedIn) {
       final success = await authService.signIn();
       if (!success) {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(content: Text('Failed to sign in to Google')),
+        showStatusMessageOn(
+          scaffoldMessenger,
+          'Failed to sign in to Google',
+          kind: StatusKind.error,
         );
         return;
       }
@@ -93,12 +98,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final result = await serverProvider.performSmartSync();
 
-    scaffoldMessenger.showSnackBar(
-      SnackBar(
-        content: Text(result.message),
-        backgroundColor:
-            result.success ? AppTheme.successColor : AppTheme.errorColor,
-      ),
+    showStatusMessageOn(
+      scaffoldMessenger,
+      result.message,
+      kind: result.success ? StatusKind.success : StatusKind.error,
     );
   }
 

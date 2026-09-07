@@ -1,3 +1,4 @@
+import 'status_message.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/server.dart';
@@ -265,9 +266,7 @@ class _ServerTileState extends State<ServerTile> {
       title: '${server.name} - SSH',
     );
 
-    scaffoldMessenger.showSnackBar(
-      const SnackBar(content: Text('Connecting...')),
-    );
+    showStatusMessageOn(scaffoldMessenger, 'Connecting...');
 
     // Each tab gets its own independent connection
     final result = await connectionProvider.connectSSH(server, tabId);
@@ -277,21 +276,18 @@ class _ServerTileState extends State<ServerTile> {
 
     if (result.success) {
       tabProvider.updateTabConnection(tabId, true);
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text('Connected'),
-          backgroundColor: AppTheme.successColor,
-        ),
+      showStatusMessageOn(
+        scaffoldMessenger,
+        'Connected',
+        kind: StatusKind.success,
       );
     } else {
       // Remove tab on failed connection
       tabProvider.removeTab(tabId);
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(result.error ?? 'Connection failed'),
-          backgroundColor: AppTheme.errorColor,
-          duration: const Duration(seconds: 5),
-        ),
+      showStatusMessageOn(
+        scaffoldMessenger,
+        result.error ?? 'Connection failed',
+        kind: StatusKind.error,
       );
     }
   }
@@ -308,9 +304,7 @@ class _ServerTileState extends State<ServerTile> {
       title: '${server.name} - SFTP',
     );
 
-    scaffoldMessenger.showSnackBar(
-      const SnackBar(content: Text('Connecting...')),
-    );
+    showStatusMessageOn(scaffoldMessenger, 'Connecting...');
 
     // Each tab gets its own independent connection
     final result = await connectionProvider.connectSFTP(server, tabId);
@@ -320,21 +314,18 @@ class _ServerTileState extends State<ServerTile> {
 
     if (result.success) {
       tabProvider.updateTabConnection(tabId, true);
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text('Connected'),
-          backgroundColor: AppTheme.successColor,
-        ),
+      showStatusMessageOn(
+        scaffoldMessenger,
+        'Connected',
+        kind: StatusKind.success,
       );
     } else {
       // Remove tab on failed connection
       tabProvider.removeTab(tabId);
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(result.error ?? 'Connection failed'),
-          backgroundColor: AppTheme.errorColor,
-          duration: const Duration(seconds: 5),
-        ),
+      showStatusMessageOn(
+        scaffoldMessenger,
+        result.error ?? 'Connection failed',
+        kind: StatusKind.error,
       );
     }
   }

@@ -1,3 +1,4 @@
+import '../status_message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -124,11 +125,10 @@ class _AddServerDialogState extends State<AddServerDialog> {
     if (success) {
       Navigator.pop(context, true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to save server'),
-          backgroundColor: AppTheme.errorColor,
-        ),
+      showStatusMessage(
+        context,
+        'Failed to save server',
+        kind: StatusKind.error,
       );
     }
   }

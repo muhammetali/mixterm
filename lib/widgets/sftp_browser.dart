@@ -1,3 +1,4 @@
+import 'status_message.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -337,11 +338,10 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     if (result.success) {
       _loadDirectory();
     } else {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(result.error ?? 'Failed to create directory'),
-          backgroundColor: AppColors.danger,
-        ),
+      showStatusMessageOn(
+        scaffoldMessenger,
+        result.error ?? 'Failed to create directory',
+        kind: StatusKind.error,
       );
     }
   }
@@ -395,11 +395,10 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     if (result.success) {
       _loadDirectory();
     } else {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(result.error ?? 'Failed to rename'),
-          backgroundColor: AppColors.danger,
-        ),
+      showStatusMessageOn(
+        scaffoldMessenger,
+        result.error ?? 'Failed to rename',
+        kind: StatusKind.error,
       );
     }
   }
@@ -448,11 +447,10 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     if (result.success) {
       _loadDirectory();
     } else {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(result.error ?? 'Failed to delete'),
-          backgroundColor: AppColors.danger,
-        ),
+      showStatusMessageOn(
+        scaffoldMessenger,
+        result.error ?? 'Failed to delete',
+        kind: StatusKind.error,
       );
     }
   }
