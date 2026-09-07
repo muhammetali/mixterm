@@ -59,7 +59,10 @@ static void my_application_activate(GApplication* application) {
   // Matches the minimum enforced on macOS in MainFlutterWindow.swift. The
   // sidebar is 280 on its own, so narrower than this leaves nothing for the
   // terminal and the layout overflows rather than adapting.
-  GdkGeometry geometry;
+  // Zero-initialised: only min_width/min_height are read under
+  // GDK_HINT_MIN_SIZE, but leaving the rest indeterminate is asking for a
+  // surprise if the mask ever grows.
+  GdkGeometry geometry = {};
   geometry.min_width = 640;
   geometry.min_height = 480;
   gtk_window_set_geometry_hints(window, nullptr, &geometry, GDK_HINT_MIN_SIZE);
