@@ -1,4 +1,7 @@
+import '../../utils/design_tokens.dart';
 import '../status_message.dart';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -137,10 +140,16 @@ class _AddServerDialogState extends State<AddServerDialog> {
   Widget build(BuildContext context) {
     final isEditing = widget.server != null;
 
+    // 500 is the width the form is laid out for, but it must never exceed
+    // the window: at the 640 minimum, a fixed 500 plus the dialog's own
+    // insets already leaves no margin, and the user can be on a smaller
+    // display than the one this was designed on.
+    final width = math.min(500.0, MediaQuery.sizeOf(context).width - 96);
+
     return Dialog(
       child: Container(
-        width: 500,
-        padding: const EdgeInsets.all(24),
+        width: width,
+        padding: EdgeInsets.all(AppSpacing.xxl),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(

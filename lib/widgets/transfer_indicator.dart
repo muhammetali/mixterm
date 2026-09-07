@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/transfer_provider.dart';
+import '../utils/design_tokens.dart';
 import '../utils/theme.dart';
 
 class TransferIndicator extends StatefulWidget {
@@ -31,8 +34,10 @@ class _TransferIndicatorState extends State<TransferIndicator> {
               borderRadius: BorderRadius.circular(8),
               color: AppTheme.cardColor,
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 300,
+                duration: AppMotion.base,
+                // Same reasoning as the add-server dialog: a fixed panel
+                // that is wider than the window has nowhere to go.
+                width: math.min(300.0, MediaQuery.sizeOf(context).width - 32),
                 height: _expanded ? 300 : 48,
                 constraints: BoxConstraints(
                   maxHeight: _expanded ? 400 : 48,

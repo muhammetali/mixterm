@@ -47,14 +47,22 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "mixterm");
+    gtk_header_bar_set_title(header_bar, "MixTerm");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "mixterm");
+    gtk_window_set_title(window, "MixTerm");
   }
 
   gtk_window_set_default_size(window, 1280, 720);
+
+  // Matches the minimum enforced on macOS in MainFlutterWindow.swift. The
+  // sidebar is 280 on its own, so narrower than this leaves nothing for the
+  // terminal and the layout overflows rather than adapting.
+  GdkGeometry geometry;
+  geometry.min_width = 640;
+  geometry.min_height = 480;
+  gtk_window_set_geometry_hints(window, nullptr, &geometry, GDK_HINT_MIN_SIZE);
 
   // Set window icon - find icon relative to executable
   g_autofree gchar* exe_path = g_file_read_link("/proc/self/exe", nullptr);

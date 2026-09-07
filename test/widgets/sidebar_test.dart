@@ -338,11 +338,14 @@ void main() {
       await tester.pumpWidget(createServerTile(server: server, isCollapsed: true));
       await tester.pumpAndSettle();
 
-      // Tooltip widget should exist
-      expect(find.byType(Tooltip), findsOneWidget);
+      // The collapsed rail shows only the initial, so the tooltip is the
+      // only place the name and login survive — assert what it actually
+      // says, not merely that a Tooltip exists.
+      final tooltip = tester.widget<Tooltip>(find.byType(Tooltip));
+      expect(tooltip.message, 'Production Server\ndeploy@prod.example.com');
     });
 
-    testWidgets('collapsed tile shows connection indicator border', (tester) async {
+    testWidgets('collapsed tile shows connection indicator border when connected', (tester) async {
       final server = Server(
         id: 'test',
         name: 'My Server',
@@ -356,44 +359,37 @@ void main() {
       await tester.pumpWidget(createServerTile(server: server, isCollapsed: true));
       await tester.pumpAndSettle();
 
-      // The tile should render without errors when connected
-      expect(find.byType(ServerTile), findsOneWidget);
+      // The collapsed rail has no room for the SSH/SFTP badges, so the
+      // border around the well is the hue-independent channel carrying
+      // connected-ness. Read the decoration rather than trusting that the
+      // tile merely rendered.
+      final decoration = tester
+          .widget<AnimatedContainer>(find.byType(AnimatedContainer))
+          .decoration as BoxDecoration;
+      expect(decoration.border, isNotNull);
     });
-  });
 
-  group('Sidebar Animation Tests', () {
-    testWidgets('sidebar width changes based on collapsed state', (tester) async {
-      // This test verifies the AnimatedContainer behavior conceptually
-      // The actual animation is tested via the HomeScreen widget
-
-      final testServers = [
-        Server(id: 'server1', name: 'Test', host: 'localhost', username: 'user'),
-      ];
-      when(() => mockServerProvider.servers).thenReturn(testServers);
-      when(() => mockConnectionProvider.hasAnySSHConnectionForServer(any())).thenReturn(false);
-      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer(any())).thenReturn(false);
-
-      // Test expanded state
-      final expandedWidget = MaterialApp(
-        home: Scaffold(
-          body: MultiProvider(
-            providers: [
-              ChangeNotifierProvider<ServerProvider>.value(value: mockServerProvider),
-              ChangeNotifierProvider<ConnectionProvider>.value(value: mockConnectionProvider),
-            ],
-            child: const ServerList(onAddServer: _emptyCallback, isCollapsed: false),
-          ),
-        ),
+    testWidgets('collapsed tile has no border when disconnected', (tester) async {
+      final server = Server(
+        id: 'test',
+        name: 'My Server',
+        host: 'localhost',
+        username: 'user',
       );
 
-      await tester.pumpWidget(expandedWidget);
+      when(() => mockConnectionProvider.hasAnySSHConnectionForServer('test')).thenReturn(false);
+      when(() => mockConnectionProvider.hasAnySFTPConnectionForServer('test')).thenReturn(false);
+
+      await tester.pumpWidget(createServerTile(server: server, isCollapsed: true));
       await tester.pumpAndSettle();
 
-      // Verify expanded mode renders correctly
-      expect(find.byType(ServerList), findsOneWidget);
-      expect(find.byType(TextField), findsOneWidget);
+      // The sibling of the test above: without it, a border painted
+      // unconditionally would still pass, and the signal would mean nothing.
+      final decoration = tester
+          .widget<AnimatedContainer>(find.byType(AnimatedContainer))
+          .decoration as BoxDecoration;
+      expect(decoration.border, isNull);
     });
   });
-}
 
-void _emptyCallback() {}
+}

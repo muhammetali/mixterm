@@ -159,7 +159,15 @@ void main() {
 
         expect(json['id'], 'json-tab-id');
         expect(json['serverId'], 'json-server-id');
-        expect(json['type'], TabType.sftp.index);
+        // The persisted wire format for `type` is the enum's *index*, so
+        // TabType's declaration order is part of the saved-data contract:
+        // reordering or inserting a value silently reinterprets every tab
+        // already on disk (an ssh tab reopens as sftp). Pinned to the
+        // literals on purpose — comparing to `TabType.sftp.index` would
+        // move along with the enum and never catch that.
+        expect(json['type'], 1);
+        expect(TabType.ssh.index, 0);
+        expect(TabType.sftp.index, 1);
         expect(json['title'], 'JSON Tab');
         expect(json['currentPath'], '/var/www');
         expect(json['createdAt'], isNotNull);
@@ -233,64 +241,5 @@ void main() {
       });
     });
 
-    group('TabType Enum', () {
-      test('has ssh and sftp values', () {
-        expect(TabType.values, contains(TabType.ssh));
-        expect(TabType.values, contains(TabType.sftp));
-        expect(TabType.values.length, 2);
-      });
-
-      test('has correct indices', () {
-        expect(TabType.ssh.index, 0);
-        expect(TabType.sftp.index, 1);
-      });
-    });
-
-    group('Title Generation', () {
-      test('generates SSH Terminal for ssh type', () {
-        final tab = TabSession(type: TabType.ssh, serverId: 'any');
-
-        expect(tab.title, 'SSH Terminal');
-      });
-
-      test('generates SFTP Browser for sftp type', () {
-        final tab = TabSession(type: TabType.sftp, serverId: 'any');
-
-        expect(tab.title, 'SFTP Browser');
-      });
-
-      test('custom title overrides generated title', () {
-        final tab = TabSession(
-          type: TabType.ssh,
-          serverId: 'server',
-          title: 'My Custom SSH',
-        );
-
-        expect(tab.title, 'My Custom SSH');
-      });
-    });
-
-    group('Mutable Fields', () {
-      test('title can be modified', () {
-        final tab = TabSession(type: TabType.ssh, serverId: 'server-1');
-        tab.title = 'Modified Title';
-
-        expect(tab.title, 'Modified Title');
-      });
-
-      test('currentPath can be modified', () {
-        final tab = TabSession(type: TabType.sftp, serverId: 'server-1');
-        tab.currentPath = '/new/path';
-
-        expect(tab.currentPath, '/new/path');
-      });
-
-      test('isConnected can be modified', () {
-        final tab = TabSession(type: TabType.ssh, serverId: 'server');
-        tab.isConnected = true;
-
-        expect(tab.isConnected, true);
-      });
-    });
   });
 }

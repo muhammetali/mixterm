@@ -237,20 +237,5 @@ void main() {
         expect(restored.terminalForegroundColor, equals(original.terminalForegroundColor));
       });
     });
-
-    group('new fields', () {
-      test('sidebarCollapsed can be set to true', () {
-        const settings = AppSettings(sidebarCollapsed: true);
-        expect(settings.sidebarCollapsed, isTrue);
-      });
-
-      test('terminalForegroundColor can be set to different values', () {
-        const greenSettings = AppSettings(terminalForegroundColor: 'Green');
-        expect(greenSettings.terminalForegroundColor, equals('Green'));
-
-        const amberSettings = AppSettings(terminalForegroundColor: 'Amber');
-        expect(amberSettings.terminalForegroundColor, equals('Amber'));
-      });
-    });
   });
 }

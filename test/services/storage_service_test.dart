@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mixterm/models/server.dart';
 import 'package:mixterm/models/settings.dart';
@@ -272,12 +271,16 @@ void main() {
         storageService = StorageService(prefs);
         await storageService.init();
 
-        final initialKey = storageService.encryptionKey;
+        final initialKey = Uint8List.fromList(storageService.encryptionKey!);
 
         await storageService.initWithGoogleId('google_user_456');
 
-        // Key should be different (derived from Google ID instead of device)
+        // init() left a device-derived key in place; in google mode
+        // initWithGoogleId must actually replace it with the Google-derived
+        // one. Asserting only isNotNull passed even when the call did
+        // nothing at all, since init() had already set a key.
         expect(storageService.encryptionKey, isNotNull);
+        expect(storageService.encryptionKey, isNot(equals(initialKey)));
       });
 
       test('does nothing when in device mode', () async {

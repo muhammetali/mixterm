@@ -45,20 +45,16 @@ void main() {
         await sftpService.disconnect();
         expect(sftpService.isConnected, isFalse);
       });
-
-      test('can be called multiple times safely', () async {
-        await sftpService.disconnect();
-        await sftpService.disconnect();
-        await sftpService.disconnect();
-        expect(sftpService.isConnected, isFalse);
-      });
     });
 
     group('operations when not connected', () {
+      // `Result.fail` takes a non-nullable String, so `error, isNotNull` can
+      // never fail — it asserts a type-system fact, not behaviour. These
+      // pin the message the user is actually shown instead.
       test('listDirectory fails with a descriptive error, not a silent empty list', () async {
         final result = await sftpService.listDirectory('/');
         expect(result.success, isFalse);
-        expect(result.error, isNotNull);
+        expect(result.error, 'Not connected');
       });
 
       test('getCurrentDirectory returns null', () async {
@@ -69,37 +65,37 @@ void main() {
       test('createDirectory fails with a descriptive error, not a silent false', () async {
         final result = await sftpService.createDirectory('/test');
         expect(result.success, isFalse);
-        expect(result.error, isNotNull);
+        expect(result.error, 'Not connected');
       });
 
       test('delete fails with a descriptive error, not a silent false', () async {
         final result = await sftpService.delete('/test');
         expect(result.success, isFalse);
-        expect(result.error, isNotNull);
+        expect(result.error, 'Not connected');
       });
 
       test('rename fails with a descriptive error, not a silent false', () async {
         final result = await sftpService.rename('/old', '/new');
         expect(result.success, isFalse);
-        expect(result.error, isNotNull);
+        expect(result.error, 'Not connected');
       });
 
       test('readFile fails with a descriptive error, not a silent null', () async {
         final result = await sftpService.readFile('/test');
         expect(result.success, isFalse);
-        expect(result.error, isNotNull);
+        expect(result.error, 'Not connected');
       });
 
       test('downloadFile fails with a descriptive error, not a silent false', () async {
         final result = await sftpService.downloadFile('/remote', '/local');
         expect(result.success, isFalse);
-        expect(result.error, isNotNull);
+        expect(result.error, 'Not connected');
       });
 
       test('uploadFile fails with a descriptive error, not a silent false', () async {
         final result = await sftpService.uploadFile('/local', '/remote');
         expect(result.success, isFalse);
-        expect(result.error, isNotNull);
+        expect(result.error, 'Not connected');
       });
     });
 

@@ -40,8 +40,10 @@ class StorageService {
     final oldKey = _encryptionKey;
     final newKey = CryptoService.deriveKeyFromGoogleId(googleUserId, _salt!);
 
-    // Re-encrypt existing data with new key
-    await _reEncryptData(oldKey!, newKey);
+    // If the stored data could not be re-encrypted, the key must not change:
+    // the data is still sealed with the old one, and adopting the new key
+    // would leave the vault permanently unreadable.
+    if (!await _reEncryptData(oldKey!, newKey)) return;
 
     _encryptionKey = newKey;
     _encryptionMode = 'google';
@@ -55,8 +57,9 @@ class StorageService {
     final oldKey = _encryptionKey;
     final newKey = await CryptoService.deriveKeyFromDevice(_salt!);
 
-    // Re-encrypt existing data with device key
-    await _reEncryptData(oldKey!, newKey);
+    // See switchToGoogleEncryption: adopting a key the data is not sealed
+    // with locks the user out of their own vault.
+    if (!await _reEncryptData(oldKey!, newKey)) return;
 
     _encryptionKey = newKey;
     _encryptionMode = 'device';
@@ -72,13 +75,22 @@ class StorageService {
     }
   }
 
-  Future<void> _reEncryptData(Uint8List oldKey, Uint8List newKey) async {
+  /// Re-seals the stored vault from [oldKey] to [newKey].
+  ///
+  /// Returns false if the data exists but could not be decrypted with
+  /// [oldKey] — the caller must then leave the active key alone, because the
+  /// stored bytes are still sealed with the old one. Returning void here is
+  /// what made a failed re-encryption silently unrecoverable: the switch
+  /// completed, the new key was adopted, and the vault could never be
+  /// opened again.
+  Future<bool> _reEncryptData(Uint8List oldKey, Uint8List newKey) async {
     final encryptedData = _prefs.getString(_serversKey);
-    if (encryptedData == null) return;
+    // Nothing stored yet is not a failure — there is simply nothing to move.
+    if (encryptedData == null) return true;
 
     // Decrypt with old key
     final decrypted = CryptoService.decryptWithKey(encryptedData, oldKey);
-    if (decrypted == null) return;
+    if (decrypted == null) return false;
 
     // Encrypt with new key
     final reEncrypted = CryptoService.encryptWithKey(decrypted, newKey);
@@ -93,6 +105,8 @@ class StorageService {
         await _prefs.setString(_backupServersKey, reEncryptedBackup);
       }
     }
+
+    return true;
   }
 
   Future<List<Server>> loadServers({bool useBackup = false}) async {

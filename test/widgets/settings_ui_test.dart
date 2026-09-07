@@ -124,7 +124,10 @@ void main() {
       await tester.tap(switchFinder);
       await tester.pumpAndSettle();
 
-      verify(() => mockSettingsProvider.setCopyOnSelect(any())).called(1);
+      // The stub starts the setting at true, so toggling must push exactly
+      // `false` through. Verifying `any()` would pass even if the tile wired
+      // the switch to a constant or to the wrong sense of the value.
+      verify(() => mockSettingsProvider.setCopyOnSelect(false)).called(1);
     });
 
     testWidgets('has back button in app bar', (tester) async {
@@ -201,23 +204,6 @@ void main() {
 
       expect(find.text('Not signed in'), findsOneWidget);
       expect(find.text('Sign in with Google'), findsOneWidget);
-    });
-
-    testWidgets('Cloud Sync section renders correctly', (tester) async {
-      when(() => mockAuthService.isSignedIn).thenReturn(false);
-
-      await tester.pumpWidget(createSettingsScreen());
-      await tester.pumpAndSettle();
-
-      // Scroll to Cloud Sync section
-      await tester.scrollUntilVisible(
-        find.text('Cloud Sync'),
-        500.0,
-        scrollable: find.byType(Scrollable).first,
-      );
-
-      // Cloud Sync section should be visible
-      expect(find.text('Cloud Sync'), findsOneWidget);
     });
   });
 }

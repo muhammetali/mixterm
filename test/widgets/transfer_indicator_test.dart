@@ -18,10 +18,18 @@ void main() {
         ),
       );
 
-      // Should be invisible (SizedBox.shrink)
-      // Check for absence of the specific container content
-      expect(find.text('Active Transfers'), findsNothing);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
+      // With no tasks the widget must render *nothing*, not merely omit the
+      // labels: every string it shows is task-derived, so asserting on absent
+      // text passes even when the panel itself is on screen. The panel is a
+      // Material, and the Scaffold supplies one of its own, so scope the
+      // check to Materials this widget put in the tree.
+      expect(
+        find.descendant(
+          of: find.byType(TransferIndicator),
+          matching: find.byType(Material),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('Shows summary when transfer starts', (WidgetTester tester) async {

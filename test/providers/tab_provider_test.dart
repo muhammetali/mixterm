@@ -40,13 +40,17 @@ void main() {
       });
 
       test('adds SFTP tab', () {
-        final tabId = tabProvider.addTab(
+        final sftpTabId = tabProvider.addTab(
           type: TabType.sftp,
           serverId: 'server-1',
           title: 'SFTP Tab',
         );
 
-        expect(tabProvider.tabs.first.type, TabType.sftp);
+        // Looked up by the returned id rather than by position: `tabs.first`
+        // would still pass if addTab returned an id pointing at a different
+        // tab than the one it created.
+        expect(tabProvider.getTab(sftpTabId)?.type, TabType.sftp);
+        expect(tabProvider.getTab(sftpTabId)?.title, 'SFTP Tab');
       });
 
       test('sets new tab as active', () {
@@ -146,6 +150,9 @@ void main() {
         final tab1 = tabProvider.addTab(type: TabType.ssh, serverId: 'server-1', title: 'Tab 1');
         final tab2 = tabProvider.addTab(type: TabType.sftp, serverId: 'server-2', title: 'Tab 2');
 
+        // Adding a tab makes it active, so tab2 is active until told otherwise.
+        expect(tabProvider.activeTabId, tab2);
+
         tabProvider.setActiveTab(tab1);
 
         expect(tabProvider.activeTabId, tab1);
@@ -160,13 +167,15 @@ void main() {
 
       test('notifies listeners', () {
         final tab1 = tabProvider.addTab(type: TabType.ssh, serverId: 'server-1', title: 'Tab 1');
-        final tab2 = tabProvider.addTab(type: TabType.sftp, serverId: 'server-2', title: 'Tab 2');
+        tabProvider.addTab(type: TabType.sftp, serverId: 'server-2', title: 'Tab 2');
         var notified = false;
         tabProvider.addListener(() => notified = true);
 
         tabProvider.setActiveTab(tab1);
 
         expect(notified, true);
+        // The notification has to accompany a real change, not replace it.
+        expect(tabProvider.activeTabId, tab1);
       });
     });
 

@@ -12,8 +12,14 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<!-- The bundle's filename stays lowercase `mixterm.app`: the Homebrew
+	     cask, the release workflow and the packaging scripts all address it
+	     by that name. These two keys are the user-visible name, which is
+	     what shows in the window title and the menu bar. -->
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>MixTerm</string>
+	<key>CFBundleDisplayName</key>
+	<string>MixTerm</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

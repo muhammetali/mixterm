@@ -12,6 +12,10 @@
 //
 //   flutter test test/utils/design_report.dart
 
+// This file's whole purpose is to print a table for a human to read, so
+// the lint against printing does not apply to it.
+// ignore_for_file: avoid_print
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';

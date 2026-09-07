@@ -172,15 +172,12 @@ class ServerProvider extends ChangeNotifier {
     return await _syncService.syncToCloud(_servers);
   }
 
-  Future<SyncResult> syncFromCloud() async {
-    final result = await _syncService.syncFromCloud();
-    if (result.success && result.servers != null) {
-      _servers = result.servers!;
-      _rebuildIndex(); // Rebuild index after sync
-      notifyListeners();
-    }
-    return result;
-  }
+  // There is deliberately no plain `syncFromCloud` here. One existed and
+  // replaced the local list wholesale with whatever the cloud returned, so a
+  // server that had not been pushed yet was deleted by pulling — and an
+  // empty or truncated cloud file emptied the vault. Nothing called it, but
+  // it sat one line away from being wired to a button. Pulling goes through
+  // [performSmartSync], which merges.
 
   Future<bool> hasCloudData() async {
     return await _syncService.hasCloudData();

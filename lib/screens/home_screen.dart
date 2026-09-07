@@ -13,11 +13,20 @@ import '../widgets/session_tab_bar.dart';
 import '../widgets/dialogs/add_server_dialog.dart';
 import '../widgets/transfer_indicator.dart';
 import '../utils/design_tokens.dart';
-import '../utils/theme.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  /// Sidebar width when it shows names, and when it is just an icon rail.
+  static const double sidebarWidth = 280;
+  static const double sidebarRailWidth = 60;
+
+  /// Below this window width the sidebar collapses on its own. Chosen so
+  /// what remains for the terminal is at least as wide as the sidebar it
+  /// sits next to; narrower than that and the sidebar is the main thing on
+  /// screen, which is not what anyone opened an SSH client for.
+  static const double sidebarCollapseWidth = 720;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -116,21 +125,34 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
-      body: Stack(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // Below this the expanded sidebar leaves too little room for a
+          // terminal to be worth looking at, so it collapses to the icon
+          // rail on its own. This does not touch the stored preference —
+          // widening the window brings the sidebar back the way the user
+          // had it.
+          final forceCollapsed =
+              constraints.maxWidth < HomeScreen.sidebarCollapseWidth;
+
+          return Stack(
         children: [
           Row(
             children: [
               Consumer<SettingsProvider>(
                 builder: (context, settings, _) {
-                  final isCollapsed = settings.sidebarCollapsed;
+                  final isCollapsed =
+                      forceCollapsed || settings.sidebarCollapsed;
                   return AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeInOut,
-                    width: isCollapsed ? 60 : 280,
+                    duration: AppMotion.slow,
+                    curve: AppMotion.standard,
+                    width: isCollapsed
+                        ? HomeScreen.sidebarRailWidth
+                        : HomeScreen.sidebarWidth,
                     decoration: const BoxDecoration(
-                      color: AppTheme.surfaceColor,
+                      color: AppColors.panel,
                       border: Border(
-                        right: BorderSide(color: AppTheme.borderColor),
+                        right: BorderSide(color: AppColors.border),
                       ),
                     ),
                     child: Column(
@@ -162,6 +184,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const TransferIndicator(),
         ],
+          );
+        },
       ),
     );
   }

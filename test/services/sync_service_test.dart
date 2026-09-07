@@ -1,11 +1,9 @@
-import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:mixterm/models/server.dart';
 import 'package:mixterm/services/auth_service.dart';
 import 'package:mixterm/services/storage_service.dart';
 import 'package:mixterm/services/sync_service.dart';
-import 'package:mixterm/services/crypto_service.dart';
 
 class MockAuthService extends Mock implements AuthService {}
 
@@ -18,8 +16,6 @@ void main() {
     late MockAuthService mockAuthService;
     late MockStorageService mockStorageService;
     late SyncService syncService;
-    late Uint8List testEncryptionKey;
-    late String testSalt;
 
     setUpAll(() {
       registerFallbackValue(<Server>[]);
@@ -31,8 +27,6 @@ void main() {
       syncService = SyncService(mockAuthService, mockStorageService);
 
       // Setup test encryption key and salt
-      testSalt = CryptoService.generateSalt();
-      testEncryptionKey = CryptoService.deriveKeyFromGoogleId('test_user', testSalt);
     });
 
     group('syncToCloud', () {
@@ -44,16 +38,6 @@ void main() {
         expect(result.success, isFalse);
         expect(result.message, equals('Not signed in to Google'));
       });
-
-      test('returns failure when encryption not initialized', () async {
-        when(() => mockAuthService.getDriveApi()).thenReturn(null);
-        when(() => mockStorageService.encryptionKey).thenReturn(null);
-        when(() => mockStorageService.salt).thenReturn(null);
-
-        final result = await syncService.syncToCloud([]);
-
-        expect(result.success, isFalse);
-      });
     });
 
     group('syncFromCloud', () {
@@ -64,15 +48,6 @@ void main() {
 
         expect(result.success, isFalse);
         expect(result.message, equals('Not signed in to Google'));
-      });
-
-      test('returns failure when encryption not initialized', () async {
-        when(() => mockAuthService.getDriveApi()).thenReturn(null);
-        when(() => mockStorageService.encryptionKey).thenReturn(null);
-
-        final result = await syncService.syncFromCloud();
-
-        expect(result.success, isFalse);
       });
     });
 

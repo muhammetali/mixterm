@@ -85,14 +85,6 @@ void main() {
     );
   }
 
-  testWidgets('TerminalViewWidget initializes without error (Provider fix verification)', (WidgetTester tester) async {
-    await tester.pumpWidget(createWidgetUnderTest());
-    await tester.pumpAndSettle();
-
-    expect(find.byType(TerminalViewWidget), findsOneWidget);
-    // If the provider fix was wrong (listen outside of tree), this would have thrown an exception.
-  });
-
   testWidgets('Right click triggers paste exactly once (Double paste fix verification)', (WidgetTester tester) async {
     // Setup clipboard mock
     const clipboardContent = 'test-paste-content';

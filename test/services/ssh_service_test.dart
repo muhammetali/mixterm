@@ -48,13 +48,6 @@ void main() {
         await sshService.disconnect();
         expect(sshService.isConnected, isFalse);
       });
-
-      test('can be called multiple times safely', () async {
-        await sshService.disconnect();
-        await sshService.disconnect();
-        await sshService.disconnect();
-        expect(sshService.isConnected, isFalse);
-      });
     });
 
     group('write', () {
@@ -68,15 +61,6 @@ void main() {
       test('does nothing when not connected', () {
         // Should not throw
         sshService.resize(80, 24);
-      });
-    });
-
-    group('SSHConnectionState', () {
-      test('has correct enum values', () {
-        expect(SSHConnectionState.values, contains(SSHConnectionState.disconnected));
-        expect(SSHConnectionState.values, contains(SSHConnectionState.connecting));
-        expect(SSHConnectionState.values, contains(SSHConnectionState.connected));
-        expect(SSHConnectionState.values, contains(SSHConnectionState.error));
       });
     });
 

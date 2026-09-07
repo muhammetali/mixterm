@@ -211,25 +211,4 @@ void main() {
       });
     });
   });
-
-  group('NamedTerminalTheme', () {
-    test('stores name and theme correctly', () {
-      final theme = NamedTerminalTheme(
-        'Test Theme',
-        AppTerminalThemes.themes.first.theme,
-      );
-
-      expect(theme.name, equals('Test Theme'));
-      expect(theme.theme, isNotNull);
-    });
-  });
-
-  group('NamedForegroundColor', () {
-    test('stores name and color correctly', () {
-      const color = NamedForegroundColor('Test Color', Color(0xFFFF0000));
-
-      expect(color.name, equals('Test Color'));
-      expect(color.color, equals(const Color(0xFFFF0000)));
-    });
-  });
 }

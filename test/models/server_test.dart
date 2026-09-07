@@ -303,13 +303,5 @@ void main() {
         expect(server.toString(), 'Server(My Server, myserver.com:22)');
       });
     });
-
-    group('AuthType Enum', () {
-      test('has password and key values', () {
-        expect(AuthType.values, contains(AuthType.password));
-        expect(AuthType.values, contains(AuthType.key));
-        expect(AuthType.values.length, 2);
-      });
-    });
   });
 }

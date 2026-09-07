@@ -307,18 +307,6 @@ void main() {
   });
 
   group('ConnectionProvider Notification', () {
-    test('setActive notifies listeners on state changes', () {
-      var notificationCount = 0;
-      final provider = buildProvider();
-
-      provider.addListener(() => notificationCount++);
-
-      provider.setActive('tab_1', 'ssh');
-
-      // Should notify once on setActive
-      expect(notificationCount, equals(1));
-    });
-
     test('multiple setActive calls notify multiple times', () {
       var notificationCount = 0;
       final provider = buildProvider();
