@@ -80,7 +80,7 @@ class _ServerTileState extends State<ServerTile> {
           onExit: (_) => setState(() => _isHovered = false),
           child: GestureDetector(
             onTap: () => _showConnectionOptions(context),
-            onSecondaryTap: () => _showContextMenu(context),
+            onSecondaryTap: _showContextMenu,
             child: AnimatedContainer(
               duration: AppMotion.fast,
               curve: AppMotion.standard,
@@ -161,7 +161,7 @@ class _ServerTileState extends State<ServerTile> {
         onExit: (_) => setState(() => _isHovered = false),
         child: GestureDetector(
           onTap: () => _showConnectionOptions(context),
-          onSecondaryTap: () => _showContextMenu(context),
+          onSecondaryTap: _showContextMenu,
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: AppSpacing.sm,
@@ -339,11 +339,13 @@ class _ServerTileState extends State<ServerTile> {
     }
   }
 
-  void _showContextMenu(BuildContext context) {
+  /// Takes no context parameter on purpose: it uses the State's own, so the
+  /// `mounted` check below actually guards the context being used.
+  Future<void> _showContextMenu() async {
     final RenderBox renderBox = context.findRenderObject() as RenderBox;
     final offset = renderBox.localToGlobal(Offset.zero);
 
-    showMenu(
+    final value = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
         offset.dx + renderBox.size.width,
@@ -383,15 +385,19 @@ class _ServerTileState extends State<ServerTile> {
           ),
         ),
       ],
-    ).then((value) {
-      if (value == 'edit') {
-        _editServer(context);
-      } else if (value == 'duplicate') {
-        _duplicateServer(context);
-      } else if (value == 'delete') {
-        _deleteServer(context);
-      }
-    });
+    );
+
+    // The menu is awaited, so this tile may have been removed from the tree
+    // while it was open.
+    if (!mounted) return;
+
+    if (value == 'edit') {
+      _editServer(context);
+    } else if (value == 'duplicate') {
+      _duplicateServer(context);
+    } else if (value == 'delete') {
+      _deleteServer(context);
+    }
   }
 
   void _editServer(BuildContext context) {

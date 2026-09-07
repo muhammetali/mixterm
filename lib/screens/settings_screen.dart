@@ -7,7 +7,7 @@ import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 import '../services/export_import_service.dart';
 import '../utils/terminal_themes.dart';
-import '../utils/theme.dart';
+import '../utils/design_tokens.dart';
 import '../utils/constants.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -26,7 +26,7 @@ class SettingsScreen extends StatelessWidget {
       body: Consumer<SettingsProvider>(
         builder: (context, settings, _) {
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(AppSpacing.lg),
             children: [
               _buildSection(
                 'Terminal',
@@ -51,14 +51,12 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: AppSpacing.xxl),
               _buildSection(
                 'Appearance',
                 [
-                  _buildDropdownTile<String>(
-                    'Font family',
+                  _buildFontFamilyTile(
                     settings.fontFamily,
-                    AppConstants.fontFamilies,
                     (value) => settings.setFontFamily(value!),
                   ),
                   _buildDropdownTile<String>(
@@ -103,7 +101,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: AppSpacing.xxl),
               _buildSection(
                 'Interface',
                 [
@@ -115,21 +113,21 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: AppSpacing.xxl),
               _buildSection(
                 'Cloud Sync',
                 [
                   _GoogleAccountTile(),
                 ],
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: AppSpacing.xxl),
               _buildSection(
                 'Data',
                 [
                   _ExportImportTile(),
                 ],
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: AppSpacing.xxl),
               _buildSection(
                 'About',
                 [
@@ -158,10 +156,8 @@ class SettingsScreen extends StatelessWidget {
           padding: const EdgeInsets.only(left: 16, bottom: 8),
           child: Text(
             title,
-            style: const TextStyle(
-              color: AppTheme.primaryColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
+            style: AppTypography.caption.copyWith(
+              color: AppColors.accent,
             ),
           ),
         ),
@@ -184,11 +180,11 @@ class SettingsScreen extends StatelessWidget {
       title: Text(title),
       subtitle: Text(
         subtitle,
-        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+        style: AppTypography.secondary,
       ),
       value: value,
       onChanged: onChanged,
-      activeColor: AppTheme.primaryColor,
+      activeThumbColor: AppColors.accent,
     );
   }
 
@@ -208,7 +204,7 @@ class SettingsScreen extends StatelessWidget {
           Text(
             value.toString(),
             style: const TextStyle(
-              color: AppTheme.primaryColor,
+              color: AppColors.accent,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -220,7 +216,64 @@ class SettingsScreen extends StatelessWidget {
         max: max,
         divisions: divisions,
         onChanged: onChanged,
-        activeColor: AppTheme.primaryColor,
+        activeColor: AppColors.accent,
+      ),
+    );
+  }
+
+  /// The font picker renders each option in the typeface it names.
+  ///
+  /// A list of family names tells you nothing about what you are choosing —
+  /// the whole reason to prefer one monospace face over another is how its
+  /// glyphs look, so the menu shows exactly that. The sample string is
+  /// chosen for the characters that actually differ between coding faces:
+  /// zero versus O, one versus l, and the punctuation that carries
+  /// ligatures.
+  Widget _buildFontFamilyTile(String value, ValueChanged<String?> onChanged) {
+    return ListTile(
+      title: const Text('Font family'),
+      subtitle: Text(
+        'Il1 O0 => != ~-',
+        style: AppTypography.secondary.copyWith(
+          fontFamily: value == 'System' ? null : value,
+          fontSize: 14,
+          color: AppColors.textSecondary,
+        ),
+      ),
+      trailing: DropdownButton<String>(
+        value: value,
+        items: AppConstants.fontFamilies.map((family) {
+          final isSystem = family == 'System';
+          return DropdownMenuItem<String>(
+            value: family,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  AppConstants.fontDisplayNames[family] ?? family,
+                  style: AppTypography.body.copyWith(
+                    color: family == value
+                        ? AppColors.accent
+                        : AppColors.textPrimary,
+                  ),
+                ),
+                SizedBox(width: AppSpacing.md),
+                Text(
+                  'Il1 O0',
+                  style: TextStyle(
+                    fontFamily: isSystem ? null : family,
+                    fontSize: 13,
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+        onChanged: onChanged,
+        underline: const SizedBox(),
+        dropdownColor: AppColors.panel,
+        style: const TextStyle(color: AppColors.accent),
       ),
     );
   }
@@ -243,8 +296,8 @@ class SettingsScreen extends StatelessWidget {
         }).toList(),
         onChanged: onChanged,
         underline: const SizedBox(),
-        dropdownColor: AppTheme.surfaceColor,
-        style: const TextStyle(color: AppTheme.primaryColor),
+        dropdownColor: AppColors.panel,
+        style: const TextStyle(color: AppColors.accent),
       ),
     );
   }
@@ -279,7 +332,7 @@ class _GoogleAccountTileState extends State<_GoogleAccountTile> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Signed in and synced successfully'),
-              backgroundColor: AppTheme.successColor,
+              backgroundColor: AppColors.success,
             ),
           );
         }
@@ -288,7 +341,7 @@ class _GoogleAccountTileState extends State<_GoogleAccountTile> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Sign in failed'),
-              backgroundColor: AppTheme.errorColor,
+              backgroundColor: AppColors.danger,
             ),
           );
         }
@@ -316,7 +369,7 @@ class _GoogleAccountTileState extends State<_GoogleAccountTile> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
+              backgroundColor: AppColors.danger,
             ),
             child: const Text('Sign Out'),
           ),
@@ -325,6 +378,9 @@ class _GoogleAccountTileState extends State<_GoogleAccountTile> {
     );
 
     if (confirm != true) return;
+
+    // The confirmation dialog is awaited, so this screen may already be gone.
+    if (!mounted) return;
 
     setState(() => _isLoading = true);
 
@@ -364,7 +420,7 @@ class _GoogleAccountTileState extends State<_GoogleAccountTile> {
           SnackBar(
             content: Text(result.message),
             backgroundColor:
-                result.success ? AppTheme.successColor : AppTheme.errorColor,
+                result.success ? AppColors.success : AppColors.danger,
           ),
         );
       }
@@ -446,7 +502,7 @@ class _GoogleAccountTileState extends State<_GoogleAccountTile> {
                 )
               : ElevatedButton.icon(
                   onPressed: _handleSignIn,
-                  icon: const Icon(Icons.login, size: 18),
+                  icon: const Icon(Icons.login, size: AppIconSize.md),
                   label: const Text('Sign in with Google'),
                 ),
         );
@@ -489,7 +545,7 @@ class _ExportImportTileState extends State<_ExportImportTile> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No servers to export'),
-          backgroundColor: AppTheme.warningColor,
+          backgroundColor: AppColors.warning,
         ),
       );
       return;
@@ -533,7 +589,7 @@ class _ExportImportTileState extends State<_ExportImportTile> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(exportResult.message),
-            backgroundColor: exportResult.success ? AppTheme.successColor : AppTheme.errorColor,
+            backgroundColor: exportResult.success ? AppColors.success : AppColors.danger,
           ),
         );
       }
@@ -566,7 +622,7 @@ class _ExportImportTileState extends State<_ExportImportTile> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(importResult.message),
-              backgroundColor: AppTheme.errorColor,
+              backgroundColor: AppColors.danger,
             ),
           );
         }
@@ -623,7 +679,7 @@ class _ExportImportTileState extends State<_ExportImportTile> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Imported $addedCount servers successfully'),
-            backgroundColor: AppTheme.successColor,
+            backgroundColor: AppColors.success,
           ),
         );
       }
@@ -648,7 +704,7 @@ class _ExportImportTileState extends State<_ExportImportTile> {
                   height: 24,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Icon(Icons.arrow_forward_ios, size: 16),
+              : const Icon(Icons.arrow_forward_ios, size: AppIconSize.md),
           onTap: _isExporting ? null : _handleExport,
         ),
         const Divider(height: 1),
@@ -662,7 +718,7 @@ class _ExportImportTileState extends State<_ExportImportTile> {
                   height: 24,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Icon(Icons.arrow_forward_ios, size: 16),
+              : const Icon(Icons.arrow_forward_ios, size: AppIconSize.md),
           onTap: _isImporting ? null : _handleImport,
         ),
       ],
@@ -692,25 +748,40 @@ class _ExportOptionsDialogState extends State<_ExportOptionsDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Exporting ${widget.serverCount} servers'),
-          const SizedBox(height: 16),
-          const Text('Format:', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          _buildFormatOption(
-            ExportFormat.json,
-            'JSON',
-            'Universal format, compatible with Termius',
+          SizedBox(height: AppSpacing.lg),
+          Text('Format:', style: AppTypography.label),
+          SizedBox(height: AppSpacing.sm),
+          // The group's value and its change handler live on the RadioGroup
+          // ancestor rather than on each tile, which is what Flutter 3.32
+          // moved to.
+          RadioGroup<ExportFormat>(
+            groupValue: _selectedFormat,
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _selectedFormat = value);
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildFormatOption(
+                  ExportFormat.json,
+                  'JSON',
+                  'Universal format, compatible with Termius',
+                ),
+                _buildFormatOption(
+                  ExportFormat.csv,
+                  'CSV',
+                  'Spreadsheet format, for Excel/Sheets',
+                ),
+                _buildFormatOption(
+                  ExportFormat.sshConfig,
+                  'SSH Config',
+                  'OpenSSH format (~/.ssh/config)',
+                ),
+              ],
+            ),
           ),
-          _buildFormatOption(
-            ExportFormat.csv,
-            'CSV',
-            'Spreadsheet format, for Excel/Sheets',
-          ),
-          _buildFormatOption(
-            ExportFormat.sshConfig,
-            'SSH Config',
-            'OpenSSH format (~/.ssh/config)',
-          ),
-          const SizedBox(height: 16),
+          SizedBox(height: AppSpacing.lg),
           if (_selectedFormat != ExportFormat.sshConfig) ...[
             CheckboxListTile(
               title: const Text('Include passwords & keys'),
@@ -718,9 +789,8 @@ class _ExportOptionsDialogState extends State<_ExportOptionsDialog> {
                 _includeSecrets
                     ? 'Sensitive data will be included'
                     : 'Only server info (safer for sharing)',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _includeSecrets ? AppTheme.warningColor : AppTheme.textSecondary,
+                style: AppTypography.secondary.copyWith(
+                  color: _includeSecrets ? AppColors.warning : null,
                 ),
               ),
               value: _includeSecrets,
@@ -730,19 +800,19 @@ class _ExportOptionsDialogState extends State<_ExportOptionsDialog> {
             ),
           ] else ...[
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
-                color: AppTheme.warningColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.warning.withValues(alpha: 0.1),
+                borderRadius: AppRadius.mdAll,
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.info_outline, size: 16, color: AppTheme.warningColor),
-                  SizedBox(width: 8),
+                  Icon(Icons.info_outline, size: AppIconSize.md, color: AppColors.warning),
+                  SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(
                       'SSH config format cannot include passwords (security by design)',
-                      style: TextStyle(fontSize: 12),
+                      style: AppTypography.secondary,
                     ),
                   ),
                 ],
@@ -770,10 +840,8 @@ class _ExportOptionsDialogState extends State<_ExportOptionsDialog> {
   Widget _buildFormatOption(ExportFormat format, String title, String subtitle) {
     return RadioListTile<ExportFormat>(
       title: Text(title),
-      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+      subtitle: Text(subtitle, style: AppTypography.secondary),
       value: format,
-      groupValue: _selectedFormat,
-      onChanged: (value) => setState(() => _selectedFormat = value!),
       contentPadding: EdgeInsets.zero,
       dense: true,
     );

@@ -115,6 +115,8 @@ class _AddServerDialogState extends State<AddServerDialog> {
       success = await serverProvider.addServer(server);
     }
 
+    if (!mounted) return;
+
     setState(() {
       _isLoading = false;
     });
@@ -253,37 +255,35 @@ class _AddServerDialogState extends State<AddServerDialog> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: RadioListTile<AuthType>(
-                        title: const Text('Password'),
-                        value: AuthType.password,
-                        groupValue: _authType,
-                        onChanged: (value) {
-                          setState(() {
-                            _authType = value!;
-                          });
-                        },
-                        contentPadding: EdgeInsets.zero,
-                        activeColor: AppTheme.primaryColor,
+                // The group's value and its change handler live on the
+                // RadioGroup ancestor rather than on each tile, which is
+                // what Flutter 3.32 moved to.
+                RadioGroup<AuthType>(
+                  groupValue: _authType,
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      _authType = value;
+                    });
+                  },
+                  child: const Row(
+                    children: [
+                      Expanded(
+                        child: RadioListTile<AuthType>(
+                          title: Text('Password'),
+                          value: AuthType.password,
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: RadioListTile<AuthType>(
-                        title: const Text('SSH Key'),
-                        value: AuthType.key,
-                        groupValue: _authType,
-                        onChanged: (value) {
-                          setState(() {
-                            _authType = value!;
-                          });
-                        },
-                        contentPadding: EdgeInsets.zero,
-                        activeColor: AppTheme.primaryColor,
+                      Expanded(
+                        child: RadioListTile<AuthType>(
+                          title: Text('SSH Key'),
+                          value: AuthType.key,
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 8),
                 if (_authType == AuthType.password)
@@ -330,7 +330,7 @@ class _AddServerDialogState extends State<AddServerDialog> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppTheme.successColor.withOpacity(0.1),
+                        color: AppTheme.successColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(color: AppTheme.successColor),
                       ),

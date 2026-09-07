@@ -89,7 +89,7 @@ class _TransferIndicatorState extends State<TransferIndicator> {
                         child: ListView.separated(
                           padding: EdgeInsets.zero,
                           itemCount: tasks.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          separatorBuilder: (_, _) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final task = tasks[index];
                             return ListTile(

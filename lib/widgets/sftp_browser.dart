@@ -10,7 +10,7 @@ import '../models/server.dart';
 import '../providers/tab_provider.dart';
 import '../providers/transfer_provider.dart';
 import '../services/sftp_service.dart';
-import '../utils/theme.dart';
+import '../utils/design_tokens.dart';
 
 class SFTPBrowser extends StatefulWidget {
   final String serverId;
@@ -86,7 +86,11 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     });
 
     try {
-      final connectionProvider = context.read<ConnectionProvider>();
+      // The dialog above is awaited, so the tab may have been closed while it
+    // was open; touching context after that throws.
+    if (!mounted) return;
+
+    final connectionProvider = context.read<ConnectionProvider>();
       final tabProvider = context.read<TabProvider>();
       final sftpService = _sftpService ?? connectionProvider.getSFTPConnection(widget.tabId);
 
@@ -163,6 +167,10 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
   }
 
   Future<void> _downloadFile(String filename, {String? localPath}) async {
+    // The dialog above is awaited, so the tab may have been closed while it
+    // was open; touching context after that throws.
+    if (!mounted) return;
+
     final connectionProvider = context.read<ConnectionProvider>();
     final transferProvider = context.read<TransferProvider>();
     final sftpService = connectionProvider.getSFTPConnection(widget.tabId);
@@ -224,6 +232,10 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
   }
 
   Future<void> _uploadFiles(List<String> filePaths) async {
+    // The dialog above is awaited, so the tab may have been closed while it
+    // was open; touching context after that throws.
+    if (!mounted) return;
+
     final connectionProvider = context.read<ConnectionProvider>();
     final transferProvider = context.read<TransferProvider>();
     final sftpService = connectionProvider.getSFTPConnection(widget.tabId);
@@ -308,6 +320,10 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
 
     if (name == null || name.isEmpty) return;
 
+    // The dialog above is awaited, so the tab may have been closed while it
+    // was open; touching context after that throws.
+    if (!mounted) return;
+
     final connectionProvider = context.read<ConnectionProvider>();
     final sftpService = connectionProvider.getSFTPConnection(widget.tabId);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
@@ -324,7 +340,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(result.error ?? 'Failed to create directory'),
-          backgroundColor: AppTheme.errorColor,
+          backgroundColor: AppColors.danger,
         ),
       );
     }
@@ -359,6 +375,10 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
 
     if (newName == null || newName.isEmpty || newName == oldName) return;
 
+    // The dialog above is awaited, so the tab may have been closed while it
+    // was open; touching context after that throws.
+    if (!mounted) return;
+
     final connectionProvider = context.read<ConnectionProvider>();
     final sftpService = connectionProvider.getSFTPConnection(widget.tabId);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
@@ -378,7 +398,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(result.error ?? 'Failed to rename'),
-          backgroundColor: AppTheme.errorColor,
+          backgroundColor: AppColors.danger,
         ),
       );
     }
@@ -398,7 +418,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
+              backgroundColor: AppColors.danger,
             ),
             child: const Text('Delete'),
           ),
@@ -407,6 +427,10 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
     );
 
     if (confirmed != true) return;
+
+    // The dialog above is awaited, so the tab may have been closed while it
+    // was open; touching context after that throws.
+    if (!mounted) return;
 
     final connectionProvider = context.read<ConnectionProvider>();
     final sftpService = connectionProvider.getSFTPConnection(widget.tabId);
@@ -427,7 +451,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(result.error ?? 'Failed to delete'),
-          backgroundColor: AppTheme.errorColor,
+          backgroundColor: AppColors.danger,
         ),
       );
     }
@@ -471,36 +495,31 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
 
   Widget _buildConnectionOverlay(Server? server) {
     return Container(
-      color: AppTheme.backgroundColor.withValues(alpha: 0.9),
+      color: AppColors.bg.withValues(alpha: 0.9),
       child: Center(
         child: Card(
-          color: AppTheme.surfaceColor,
+          color: AppColors.panel,
           child: Padding(
-            padding: const EdgeInsets.all(32),
+            padding: EdgeInsets.all(AppSpacing.xxxl),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (server != null) ...[
                   Text(
                     server.name,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryColor,
+                    style: AppTypography.display.copyWith(
+                      color: AppColors.accent,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: AppSpacing.xs),
                   Text(
                     '${server.host}:${server.port}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
-                    ),
+                    style: AppTypography.secondary,
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: AppSpacing.xxl),
                 ],
                 const CircularProgressIndicator(),
-                const SizedBox(height: 24),
+                SizedBox(height: AppSpacing.xxl),
                 const Text('Connecting to SFTP...'),
               ],
             ),
@@ -512,23 +531,21 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
 
   Widget _buildDragOverlay() {
     return Container(
-      color: AppTheme.primaryColor.withValues(alpha: 0.2),
-      child: const Center(
+      color: AppColors.accentSubtle,
+      child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               Icons.cloud_upload,
-              size: 64,
-              color: AppTheme.primaryColor,
+              size: AppIconSize.display,
+              color: AppColors.accent,
             ),
-            SizedBox(height: 16),
+            SizedBox(height: AppSpacing.lg),
             Text(
               'Drop files here to upload',
-              style: TextStyle(
-                fontSize: 18,
-                color: AppTheme.primaryColor,
-                fontWeight: FontWeight.bold,
+              style: AppTypography.title.copyWith(
+                color: AppColors.accent,
               ),
             ),
           ],
@@ -542,43 +559,47 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
       height: 40,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: const BoxDecoration(
-        color: AppTheme.surfaceColor,
+        color: AppColors.panel,
         border: Border(
-          bottom: BorderSide(color: AppTheme.borderColor),
+          bottom: BorderSide(color: AppColors.border),
         ),
       ),
       child: Row(
         children: [
-          const Icon(Icons.folder_outlined, size: 18, color: AppTheme.primaryColor),
-          const SizedBox(width: 8),
+          const Icon(Icons.folder_outlined, size: AppIconSize.md, color: AppColors.accent),
+          SizedBox(width: AppSpacing.sm),
           Text(
             '$title - SFTP',
             style: const TextStyle(
               fontWeight: FontWeight.w500,
-              color: AppTheme.textColor,
+              color: AppColors.textPrimary,
             ),
           ),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.create_new_folder, size: 18),
+            icon: const Icon(Icons.create_new_folder, size: AppIconSize.md),
             tooltip: 'Create directory',
             onPressed: _createDirectory,
           ),
           IconButton(
-            icon: const Icon(Icons.upload_file, size: 18),
+            icon: const Icon(Icons.upload_file, size: AppIconSize.md),
             tooltip: 'Upload file',
             onPressed: _uploadFile,
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, size: 18),
+            icon: const Icon(Icons.refresh, size: AppIconSize.md),
             tooltip: 'Refresh',
             onPressed: () => _loadDirectory(),
           ),
           IconButton(
-            icon: const Icon(Icons.close, size: 18),
+            icon: const Icon(Icons.close, size: AppIconSize.md),
             tooltip: 'Disconnect',
             onPressed: () {
-              final connectionProvider = context.read<ConnectionProvider>();
+              // The dialog above is awaited, so the tab may have been closed while it
+    // was open; touching context after that throws.
+    if (!mounted) return;
+
+    final connectionProvider = context.read<ConnectionProvider>();
               final tabProvider = context.read<TabProvider>();
               connectionProvider.disconnectTab(widget.tabId);
               tabProvider.removeTab(widget.tabId);
@@ -596,21 +617,21 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: const BoxDecoration(
-        color: AppTheme.cardColor,
+        color: AppColors.raised,
         border: Border(
-          bottom: BorderSide(color: AppTheme.borderColor),
+          bottom: BorderSide(color: AppColors.border),
         ),
       ),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_upward, size: 16),
+            icon: const Icon(Icons.arrow_upward, size: AppIconSize.md),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32),
             onPressed: _navigateUp,
             tooltip: 'Go up',
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppSpacing.sm),
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -622,12 +643,12 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
                       padding: EdgeInsets.symmetric(horizontal: 4),
                       child: Text(
                         '/',
-                        style: TextStyle(color: AppTheme.primaryColor),
+                        style: TextStyle(color: AppColors.accent),
                       ),
                     ),
                   ),
                   for (var i = 0; i < parts.length; i++) ...[
-                    const Text(' / ', style: TextStyle(color: AppTheme.textSecondary)),
+                    const Text(' / ', style: TextStyle(color: AppColors.textSecondary)),
                     InkWell(
                       onTap: () {
                         final path = '/${parts.sublist(0, i + 1).join('/')}';
@@ -639,8 +660,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
                           parts[i],
                           style: TextStyle(
                             color: i == parts.length - 1
-                                ? AppTheme.textColor
-                                : AppTheme.primaryColor,
+                                ? AppColors.textPrimary
+                                : AppColors.accent,
                           ),
                         ),
                       ),
@@ -669,26 +690,21 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
             if (server != null) ...[
                Text(
                 server.name,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryColor,
+                style: AppTypography.title.copyWith(
+                  color: AppColors.accent,
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: AppSpacing.xs),
               Text(
                 '${server.host}:${server.port}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.textSecondary,
-                ),
+                style: AppTypography.secondary,
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: AppSpacing.xxl),
             ],
-            const Icon(Icons.error_outline, size: 48, color: AppTheme.errorColor),
-            const SizedBox(height: 16),
-            Text(_error!, style: const TextStyle(color: AppTheme.errorColor)),
-            const SizedBox(height: 16),
+            const Icon(Icons.error_outline, size: AppIconSize.display, color: AppColors.danger),
+            SizedBox(height: AppSpacing.lg),
+            Text(_error!, style: const TextStyle(color: AppColors.danger)),
+            SizedBox(height: AppSpacing.lg),
             ElevatedButton(
               onPressed: () => _loadDirectory(),
               child: const Text('Retry'),
@@ -703,16 +719,16 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.folder_open, size: 48, color: AppTheme.textSecondary),
-            SizedBox(height: 16),
+            Icon(Icons.folder_open, size: AppIconSize.display, color: AppColors.textSecondary),
+            SizedBox(height: AppSpacing.lg),
             Text(
               'Empty directory',
-              style: TextStyle(color: AppTheme.textSecondary),
+              style: TextStyle(color: AppColors.textSecondary),
             ),
-            SizedBox(height: 8),
+            SizedBox(height: AppSpacing.sm),
             Text(
               'Drop files here to upload',
-              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+              style: AppTypography.secondary,
             ),
           ],
         ),
@@ -744,20 +760,20 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
       feedback: Material(
         color: Colors.transparent,
         child: Container(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(AppSpacing.sm),
           decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withValues(alpha: 0.9),
-            borderRadius: BorderRadius.circular(4),
+            color: AppColors.accent.withValues(alpha: 0.9),
+            borderRadius: AppRadius.smAll,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 isDir ? Icons.folder_outlined : Icons.insert_drive_file,
-                size: 16,
+                size: AppIconSize.md,
                 color: Colors.white,
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppSpacing.sm),
               Text(
                 filename,
                 style: const TextStyle(color: Colors.white),
@@ -792,38 +808,41 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: isSelected
-                ? AppTheme.primaryColor.withValues(alpha: 0.2)
+                ? AppColors.accent.withValues(alpha: 0.2)
                 : null,
             border: isSelected
-                ? Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.5))
+                ? Border.all(color: AppColors.accent.withValues(alpha: 0.5))
                 : null,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: AppRadius.smAll,
           ),
           child: Row(
             children: [
               Icon(
                 isDir ? Icons.folder_outlined : _getFileIcon(filename),
-                size: 20,
-                color: isDir ? AppTheme.primaryColor : AppTheme.textSecondary,
+                size: AppIconSize.lg,
+                color: isDir ? AppColors.accent : AppColors.textSecondary,
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       filename,
-                      style: TextStyle(
-                        color: isSelected ? AppTheme.primaryColor : AppTheme.textColor,
-                        fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      style: (isSelected
+                              ? AppTypography.bodyStrong
+                              : AppTypography.body)
+                          .copyWith(
+                        color: isSelected
+                            ? AppColors.accent
+                            : AppColors.textPrimary,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       _formatSize(item.attr.size ?? 0),
                       style: const TextStyle(
-                        color: AppTheme.textSecondary,
+                        color: AppColors.textSecondary,
                         fontSize: 11,
                       ),
                     ),
@@ -831,7 +850,7 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
                 ),
               ),
               PopupMenuButton(
-                icon: const Icon(Icons.more_vert, size: 18),
+                icon: const Icon(Icons.more_vert, size: AppIconSize.md),
                 onOpened: () {
                   // Select item when menu opens
                   setState(() {
@@ -844,8 +863,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
                       value: 'download',
                       child: Row(
                         children: [
-                          Icon(Icons.download, size: 18),
-                          SizedBox(width: 8),
+                          Icon(Icons.download, size: AppIconSize.md),
+                          SizedBox(width: AppSpacing.sm),
                           Text('Download'),
                         ],
                       ),
@@ -854,8 +873,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
                       value: 'download_as',
                       child: Row(
                         children: [
-                          Icon(Icons.download_for_offline, size: 18),
-                          SizedBox(width: 8),
+                          Icon(Icons.download_for_offline, size: AppIconSize.md),
+                          SizedBox(width: AppSpacing.sm),
                           Text('Download As...'),
                         ],
                       ),
@@ -866,8 +885,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
                       value: 'open',
                       child: Row(
                         children: [
-                          Icon(Icons.folder_open, size: 18),
-                          SizedBox(width: 8),
+                          Icon(Icons.folder_open, size: AppIconSize.md),
+                          SizedBox(width: AppSpacing.sm),
                           Text('Open'),
                         ],
                       ),
@@ -876,8 +895,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
                     value: 'rename',
                     child: Row(
                       children: [
-                        Icon(Icons.edit, size: 18),
-                        SizedBox(width: 8),
+                        Icon(Icons.edit, size: AppIconSize.md),
+                        SizedBox(width: AppSpacing.sm),
                         Text('Rename'),
                       ],
                     ),
@@ -886,9 +905,9 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
                     value: 'delete',
                     child: Row(
                       children: [
-                        Icon(Icons.delete, size: 18, color: AppTheme.errorColor),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: AppTheme.errorColor)),
+                        Icon(Icons.delete, size: AppIconSize.md, color: AppColors.danger),
+                        SizedBox(width: AppSpacing.sm),
+                        Text('Delete', style: TextStyle(color: AppColors.danger)),
                       ],
                     ),
                   ),
@@ -932,8 +951,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
             value: 'open',
             child: Row(
               children: [
-                Icon(Icons.folder_open, size: 18),
-                SizedBox(width: 8),
+                Icon(Icons.folder_open, size: AppIconSize.md),
+                SizedBox(width: AppSpacing.sm),
                 Text('Open'),
               ],
             ),
@@ -943,8 +962,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
             value: 'download',
             child: Row(
               children: [
-                Icon(Icons.download, size: 18),
-                SizedBox(width: 8),
+                Icon(Icons.download, size: AppIconSize.md),
+                SizedBox(width: AppSpacing.sm),
                 Text('Download'),
               ],
             ),
@@ -953,8 +972,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
             value: 'download_as',
             child: Row(
               children: [
-                Icon(Icons.download_for_offline, size: 18),
-                SizedBox(width: 8),
+                Icon(Icons.download_for_offline, size: AppIconSize.md),
+                SizedBox(width: AppSpacing.sm),
                 Text('Download As...'),
               ],
             ),
@@ -964,8 +983,8 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
           value: 'rename',
           child: Row(
             children: [
-              Icon(Icons.edit, size: 18),
-              SizedBox(width: 8),
+              Icon(Icons.edit, size: AppIconSize.md),
+              SizedBox(width: AppSpacing.sm),
               Text('Rename'),
             ],
           ),
@@ -975,9 +994,9 @@ class _SFTPBrowserState extends State<SFTPBrowser> {
           value: 'delete',
           child: Row(
             children: [
-              Icon(Icons.delete, size: 18, color: AppTheme.errorColor),
-              SizedBox(width: 8),
-              Text('Delete', style: TextStyle(color: AppTheme.errorColor)),
+              Icon(Icons.delete, size: AppIconSize.md, color: AppColors.danger),
+              SizedBox(width: AppSpacing.sm),
+              Text('Delete', style: TextStyle(color: AppColors.danger)),
             ],
           ),
         ),

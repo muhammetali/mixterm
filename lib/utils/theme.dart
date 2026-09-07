@@ -32,6 +32,13 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+
+      // Bundled rather than inherited from the platform. The type scale's
+      // sizes and tracking were measured against one rendering, and the
+      // system default is SF Pro on macOS but anything at all on Linux —
+      // so leaving it to the platform means the interface is only actually
+      // designed on one of the two it ships to.
+      fontFamily: 'Inter',
       primaryColor: AppColors.accent,
       scaffoldBackgroundColor: AppColors.bg,
       colorScheme: const ColorScheme.dark(
