@@ -332,7 +332,13 @@
         </menu>
         <window title="APP_NAME" allowsToolTipsWhenApplicationIsInactive="NO" autorecalculatesKeyViewLoop="NO" releasedWhenClosed="NO" animationBehavior="default" id="QvC-M9-y7g" customClass="MainFlutterWindow" customModule="Runner" customModuleProvider="target">
             <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES" resizable="YES"/>
-            <rect key="contentRect" x="335" y="390" width="800" height="600"/>
+            <!-- The window's first-run size. It lives here rather than in
+                 MainFlutterWindow.swift because AppKit applies the nib's
+                 contentRect after awakeFromNib returns: code that set a
+                 size there measured correctly on the next line and was
+                 then silently overwritten. See MainFlutterWindow.swift for
+                 how 1232x740 is derived. -->
+            <rect key="contentRect" x="335" y="390" width="1232" height="740"/>
             <rect key="screenRect" x="0.0" y="0.0" width="2560" height="1577"/>
             <view key="contentView" wantsLayer="YES" id="EiT-Mj-1SZ">
                 <rect key="frame" x="0.0" y="0.0" width="800" height="600"/>

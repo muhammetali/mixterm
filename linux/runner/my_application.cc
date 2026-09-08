@@ -54,7 +54,11 @@ static void my_application_activate(GApplication* application) {
     gtk_window_set_title(window, "MixTerm");
   }
 
-  gtk_window_set_default_size(window, 1280, 720);
+  // Same derivation as MainFlutterWindow.swift, which carries the working:
+  // a 120x40 terminal beside the 280pt sidebar, under the 36pt tab bar and
+  // the 40pt toolbar. Kept identical so the app does not open at two
+  // different sizes for the same stated reason.
+  gtk_window_set_default_size(window, 1232, 740);
 
   // Matches the minimum enforced on macOS in MainFlutterWindow.swift. The
   // sidebar is 280 on its own, so narrower than this leaves nothing for the
