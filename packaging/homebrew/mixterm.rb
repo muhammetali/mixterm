@@ -7,14 +7,20 @@ cask "mixterm" do
   desc "SSH/SFTP client with multi-tab terminals and encrypted credential storage"
   homepage "https://github.com/muhammetali/mixterm"
 
-  # LSMinimumSystemVersion in the shipped bundle, not a guess. An earlier
-  # draft of this file said big_sur, which would have refused to install on
-  # two releases of macOS the app actually runs on.
-  depends_on macos: ">= :catalina"
+  # No `depends_on macos:` on purpose. The bundle's LSMinimumSystemVersion is
+  # 10.15, and Homebrew has removed version constraints that old outright —
+  # `depends_on macos: :catalina` is disabled with "There is no replacement",
+  # which makes the whole tap fail to load, not just this line. Every macOS
+  # Homebrew still supports is far past 10.15, so the constraint said nothing
+  # anyway. (An earlier draft asked for big_sur, which was simply wrong: it
+  # would have refused two releases the app runs on.)
 
-  # Lowercase, matching the bundle inside the zip. The display name is
-  # MixTerm — see CFBundleName — but the directory is not.
-  app "mixterm.app"
+  # The bundle inside the zip is lowercase, but it installs as MixTerm.app:
+  # that is CFBundleName, it is what the release notes and the Linux
+  # packages call it, and macOS filesystems are case-insensitive by default,
+  # so shipping `mixterm.app` would collide with a hand-installed
+  # `MixTerm.app` rather than replace it.
+  app "mixterm.app", target: "MixTerm.app"
 
   # The app is sandboxed, so everything it writes lives under its container.
   # An earlier draft listed ~/Library/Application Support/mixterm and
