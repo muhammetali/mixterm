@@ -24,10 +24,31 @@ class SSHService {
   final StreamController<SSHConnectionState> _stateController =
       StreamController<SSHConnectionState>.broadcast();
 
+  /// The size the local terminal last reported, in character cells.
+  ///
+  /// Kept here rather than only forwarded, because the view learns its size
+  /// during its first layout — which happens *before* the session exists.
+  /// Forwarding that first measurement into a null session silently dropped
+  /// it, so the remote PTY kept the 80x24 default while the window showed
+  /// something else entirely. The shell then did its cursor arithmetic
+  /// against the wrong width, and any redraw crossing the real column 80 —
+  /// a tab completion, a long prompt, `less`, `vim` — landed in the wrong
+  /// place.
+  ///
+  /// 80x24 remains the starting value because that is what a PTY gets when
+  /// nobody says otherwise, not because it is a good guess.
+  int _columns = 80;
+  int _rows = 24;
+
   Stream<String> get outputStream => _outputController.stream;
   Stream<SSHConnectionState> get stateStream => _stateController.stream;
 
   bool get isConnected => _client != null && !_client!.isClosed;
+
+  /// The terminal size this service will request, or has requested.
+  @visibleForTesting
+  ({int columns, int rows}) get terminalSize =>
+      (columns: _columns, rows: _rows);
 
   Future<VoidResult> connect(Server server) async {
     try {
@@ -98,11 +119,11 @@ class SSHService {
 
       _session = await _client!.shell(
         pty: SSHPtyConfig(
-          width: 80,
-          height: 24,
+          width: _columns,
+          height: _rows,
         ),
       );
-      debugPrint('SSH: Shell session started');
+      debugPrint('SSH: Shell session started at ${_columns}x$_rows');
 
       _stdoutSubscription = _session!.stdout.listen((data) {
         _outputController.add(utf8.decode(data, allowMalformed: true));
@@ -144,8 +165,19 @@ class SSHService {
     }
   }
 
+  /// Records the terminal size and, if a session is already running, tells
+  /// the remote about it.
+  ///
+  /// Safe to call before [connect]: the size is remembered and used for the
+  /// PTY the shell is opened with, so the very first prompt is drawn against
+  /// the right width.
   void resize(int width, int height) {
-    debugPrint('SSH: Resizing terminal to ${width}x$height');
+    if (width <= 0 || height <= 0) return;
+    if (width == _columns && height == _rows) return;
+
+    _columns = width;
+    _rows = height;
+    debugPrint('SSH: Terminal size now ${width}x$height');
     _session?.resizeTerminal(width, height);
   }
 

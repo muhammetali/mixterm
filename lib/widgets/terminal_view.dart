@@ -176,6 +176,17 @@ class _TerminalViewWidgetState extends State<TerminalViewWidget> {
   void _setupServiceListeners() {
     if (_sshService == null) return;
 
+    // The terminal has usually been laid out long before a session exists,
+    // and [Terminal.onResize] only fires when the size *changes* — so
+    // attaching to a service without this leaves the remote believing the
+    // window is the 80x24 a PTY defaults to. Pushing the size we already
+    // know closes that gap for a first connection, a reconnect, and a tab
+    // that was opened before its session came up.
+    final terminal = _terminal;
+    if (terminal != null) {
+      _sshService!.resize(terminal.viewWidth, terminal.viewHeight);
+    }
+
     // Listen to state changes from service
     _connectionSubscription = _sshService!.stateStream.listen((state) {
       if (!mounted) return;
