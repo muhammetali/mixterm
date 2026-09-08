@@ -128,9 +128,66 @@ HEADER
   done
 } > "$copyright"
 
-# Control file with the real version substituted in
-sed "s/__VERSION__/${VERSION}/" packaging/debian/control.template \
+# Dependencies, computed from the binaries rather than declared by hand.
+#
+# The control template used to say `Depends: libgtk-3-0` and nothing else.
+# That is not a description of what the package needs: the app and its
+# bundled Flutter libraries are linked against whatever glibc the build host
+# had, and saying nothing about it means apt installs the package on a system
+# that cannot run it. The snap hit the same wall from the other direction and
+# refused to start with "libgtk-3.so.0: version `GLIBC_2.38' not found".
+#
+# dpkg-shlibdeps reads the ELF symbols and produces the real answer,
+# including the libc6 floor, so this cannot drift when the build host moves.
+DEPENDS_DIR="build/deb/shlibdeps"
+rm -rf "$DEPENDS_DIR"
+mkdir -p "$DEPENDS_DIR/debian"
+
+# dpkg-shlibdeps insists on a debian/control to take the package name from,
+# even with -O printing to stdout.
+cat > "$DEPENDS_DIR/debian/control" <<EOF
+Source: ${PKG_NAME}
+Package: ${PKG_NAME}
+Architecture: ${ARCH}
+EOF
+
+# --ignore-missing-info because the bundled Flutter libraries belong to no
+# package; their own dependencies still get read from their symbols.
+DEPENDS="$(
+  cd "$DEPENDS_DIR" && dpkg-shlibdeps -O --ignore-missing-info \
+    "$PROJECT_DIR/$STAGING_DIR/usr/lib/mixterm/mixterm" \
+    "$PROJECT_DIR/$STAGING_DIR"/usr/lib/mixterm/lib/*.so 2>/dev/null \
+    | sed -n 's/^shlibs:Depends=//p'
+)"
+
+if [ -z "$DEPENDS" ]; then
+  echo "error: dpkg-shlibdeps produced no dependencies — refusing to ship a" >&2
+  echo "       package that does not say what it needs" >&2
+  exit 1
+fi
+
+# libc6 is the one that matters here, and its absence is what made the
+# previous package installable on systems it could not run on.
+case "$DEPENDS" in
+  *libc6*) : ;;
+  *) echo "error: computed dependencies name no libc6: $DEPENDS" >&2; exit 1 ;;
+esac
+
+echo "Computed dependencies: $DEPENDS"
+
+# Control file with the real version and dependencies substituted in
+sed -e "s/__VERSION__/${VERSION}/" \
+    -e "s|__DEPENDS__|${DEPENDS}|" \
+    packaging/debian/control.template \
   > "$STAGING_DIR/DEBIAN/control"
+
+# Written as an `if` rather than `grep && { }`: under `set -e` the latter's
+# exit status depends on a bash subtlety nobody should have to recall.
+if grep -q '__' "$STAGING_DIR/DEBIAN/control"; then
+  echo "error: unsubstituted placeholder left in control:" >&2
+  grep '__' "$STAGING_DIR/DEBIAN/control" >&2
+  exit 1
+fi
 
 DEB_FILE="build/deb/mixterm_${VERSION}_${ARCH}.deb"
 dpkg-deb --build --root-owner-group "$STAGING_DIR" "$DEB_FILE"

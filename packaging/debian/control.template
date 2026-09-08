@@ -3,7 +3,7 @@ Version: __VERSION__
 Section: net
 Priority: optional
 Architecture: amd64
-Depends: libgtk-3-0
+Depends: __DEPENDS__
 Maintainer: Muhammet Ali Özçelik <noreply@mixterm.app>
 Homepage: https://github.com/muhammetali/mixterm
 Description: Professional SSH/SFTP client for Linux

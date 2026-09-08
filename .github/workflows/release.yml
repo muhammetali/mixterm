@@ -148,7 +148,13 @@ jobs:
           path: mixterm-macos.zip
 
   build-linux-deb:
-    runs-on: ubuntu-latest
+    # 22.04 rather than latest, deliberately. A Flutter Linux binary links
+    # against the glibc of the host it was built on, so building here makes
+    # the package installable on 22.04 and 24.04 alike; building on 24.04
+    # silently drops everything older. dpkg-shlibdeps in build_deb.sh then
+    # states whatever floor this host actually implies, so the two cannot
+    # disagree.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
@@ -172,6 +178,39 @@ jobs:
 
       - run: flutter pub get
       - run: bash scripts/build_deb.sh
+
+      # Building a .deb proves almost nothing about it. This installs the
+      # thing and asks lintian what Debian thinks of it, which is how the
+      # missing copyright file would have been noticed without someone
+      # running lintian by hand after an install.
+      #
+      # Errors fail the build; warnings are printed. A Flutter app ships its
+      # own libraries and no man page, so it will always have warnings, and
+      # failing on those would just teach everyone to ignore this step.
+      - name: Check the package installs and what lintian says
+        run: |
+          sudo apt-get install -y lintian
+          deb="$(ls build/deb/*.deb)"
+
+          echo "::group::declared dependencies"
+          dpkg-deb -f "$deb" Depends
+          echo "::endgroup::"
+
+          sudo apt-get install -y "./$deb"
+          dpkg -s mixterm | grep -E '^(Status|Version|Depends)'
+          test -x /usr/bin/mixterm || test -L /usr/bin/mixterm
+          test -f /usr/share/doc/mixterm/copyright
+
+          echo "::group::lintian"
+          lintian --no-tag-display-limit "$deb" || true
+          echo "::endgroup::"
+
+          if lintian --fail-on error --no-tag-display-limit "$deb"; then
+            echo "no lintian errors"
+          else
+            echo "::error::lintian reported errors above"
+            exit 1
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
