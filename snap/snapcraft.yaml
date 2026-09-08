@@ -29,16 +29,31 @@ confinement: strict
 apps:
   mixterm:
     command: usr/bin/mixterm
+
+    # The gnome extension, not a hand-picked library list.
+    #
+    # 1.1.5 and 1.1.7 both installed and then died with
+    #
+    #   Couldn't open libEGL.so.1: cannot open shared object file
+    #
+    # because the Flutter engine dlopens its GL stack at runtime rather than
+    # linking it. Adding libegl1 to stage-packages would move the failure
+    # along to the next dlopen — and mesa staged inside a snap fights the
+    # host's drivers anyway. The extension exists for exactly this: it wires
+    # in the GNOME runtime and the graphics-core24 content snap, so GL, GTK,
+    # themes, fonts and icons all come from outside the snap and match the
+    # host.
+    #
+    # It also supplies the desktop, desktop-legacy, gsettings, opengl,
+    # wayland and x11 plugs, which is why they are no longer listed here.
+    extensions:
+      - gnome
+
     plugs:
       - network
       - network-bind
       - home
       - removable-media
-      - desktop
-      - desktop-legacy
-      - wayland
-      - x11
-      - opengl
     desktop: usr/share/applications/com.mixterm.mixterm.desktop
 
 parts:
@@ -59,15 +74,16 @@ parts:
     # Relative to the project root (where `snapcraft` is invoked from in
     # CI), not to this snap/ directory.
     source: build/linux/x64/release/bundle
-    stage-packages:
-      - libgtk-3-0
+    # No stage-packages. GTK arrives through the gnome extension's runtime,
+    # and staging a second copy is how the glibc mismatch got in: packages
+    # pulled from the build host, resolved against a different base.
     override-build: |
       craftctl default
-      # Move only the dumped bundle's own top-level entries into
-      # usr/lib/mixterm/ — NOT a blanket `organize: "*"`, which also
-      # matches stage-packages' own usr/ tree (already extracted into
-      # this same install dir by `craftctl default`) and fails trying to
-      # move usr/ into usr/lib/mixterm/usr/.
+      # Move the dumped bundle's own top-level entries into
+      # usr/lib/mixterm/, naming them rather than using a blanket
+      # `organize: "*"`: that also matches any usr/ tree a future
+      # stage-packages would extract here, and fails trying to move usr/
+      # into usr/lib/mixterm/usr/.
       mkdir -p "$CRAFT_PART_INSTALL/usr/lib/mixterm"
       mv "$CRAFT_PART_INSTALL"/mixterm "$CRAFT_PART_INSTALL"/lib "$CRAFT_PART_INSTALL"/data \
         "$CRAFT_PART_INSTALL/usr/lib/mixterm/"

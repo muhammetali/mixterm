@@ -263,60 +263,68 @@ jobs:
       - run: flutter pub get
       - run: flutter build linux --release
 
-      - run: sudo snap install snapcraft --classic
+      # Built in a container, not on the runner.
+      #
+      # `--destructive-mode` builds against the host's apt, which is how a
+      # core22 snap ended up carrying 24.04 libraries and refusing to start.
+      # It also installs the gnome extension's SDK onto the runner, which has
+      # already produced a libunistring conflict here once. A container makes
+      # the base and the staged packages the same thing by construction.
+      - uses: snapcore/action-build@v1.3.0
+        id: snapcraft
 
-      # --destructive-mode builds directly on the runner instead of in an
-      # LXD/multipass VM, which GitHub's ubuntu-latest runners don't have
-      # set up. This only produces the .snap file; publishing to the Snap
-      # Store is a separate, manual `snapcraft upload` step that needs
-      # your own Snapcraft/Ubuntu One login (see packaging/README.md).
-      - run: sudo snapcraft --destructive-mode
-
-      # Does the thing actually start? Everything up to here only proves it
-      # packaged. v1.1.4 built, uploaded, passed the store's automated review
-      # and reached `stable` — and then died on launch with
+      # Start it. Nothing above can see a dlopen failure: ldd reports what an
+      # ELF links against, and the Flutter engine opens its GL stack at
+      # runtime, so 1.1.5 and 1.1.7 both passed a library check and then died
+      # with "Couldn't open libEGL.so.1: cannot open shared object file".
       #
-      #   libgtk-3.so.0: version `GLIBC_2.38' not found
-      #
-      # because stage-packages came from this 24.04 host while the manifest
-      # asked for a core22 runtime. Nothing in the pipeline was looking.
-      #
-      # The check has to happen inside the snap's own mount namespace: on the
-      # host, ldd resolves against the host's glibc and reports nothing. Only
-      # `snap run --shell` sees the base the app will actually get.
-      - name: Check the snap resolves its libraries
+      # Three releases were published broken because the pipeline never ran
+      # what it built. This is the check that would have caught all three.
+      - name: Check the snap starts
         run: |
-          sudo snap install --dangerous ./*.snap
+          sudo apt-get install -y xvfb
 
-          sudo snap run --shell mixterm -c '
-            ldd "$SNAP/usr/lib/mixterm/mixterm"
-            ldd "$SNAP"/usr/lib/*/lib*.so* 2>/dev/null || true
-          ' > ldd.txt 2>&1
+          # The gnome extension takes GTK, GL and themes from content snaps.
+          # Installing a local snap does not pull those in, so without them
+          # the app would fail here for a reason that has nothing to do with
+          # the package.
+          sudo snap install gnome-46-2404 || true
+          sudo snap install mesa-2404 || true
+          sudo snap install gtk-common-themes || true
 
-          if grep -E "not found" ldd.txt; then
-            echo "::error::the snap cannot resolve its libraries against base $(grep -m1 '^base:' snap/snapcraft.yaml | awk '{print $2}') — it would install and then fail to start"
+          sudo snap install --dangerous "${{ steps.snapcraft.outputs.snap }}"
+
+          echo "::group::interfaces"
+          snap connections mixterm || true
+          echo "::endgroup::"
+
+          set +e
+          output="$(xvfb-run -a timeout 30 mixterm 2>&1)"
+          status=$?
+          set -e
+
+          echo "::group::application output"
+          echo "$output"
+          echo "::endgroup::"
+
+          if echo "$output" | grep -qE "cannot open shared object|core dumped|Aborted|GLIBC_|Couldn't open"; then
+            echo "::error::the snap installs and then fails to start"
             exit 1
           fi
 
-          # Absence of "not found" is only good news if something was looked
-          # at. Grepping empty output passes just as cleanly as grepping a
-          # healthy snap, so the count is asserted too — a GTK application
-          # resolves dozens of libraries, and anything near zero means the
-          # inspection itself failed and this check was measuring nothing.
-          resolved="$(grep -c '=>' ldd.txt || true)"
-          echo "resolved libraries: $resolved"
-          if [ "$resolved" -lt 20 ]; then
-            echo "::error::only $resolved libraries resolved — the check did not inspect the snap"
-            sed -n '1,20p' ldd.txt
+          # A window-bearing app should still be alive when the timeout fires,
+          # which kills it with 124. Any other status means it gave up.
+          if [ "$status" -ne 124 ]; then
+            echo "::error::the app exited on its own with status $status"
             exit 1
           fi
 
-          echo "all libraries resolved against the declared base"
+          echo "ran for 30s without failing"
 
       - uses: actions/upload-artifact@v4
         with:
           name: mixterm-snap
-          path: "*.snap"
+          path: ${{ steps.snapcraft.outputs.snap }}
 
   create-release:
     needs: [build-macos, build-linux-deb, build-snap]
