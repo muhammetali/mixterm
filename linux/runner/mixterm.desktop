@@ -5,6 +5,6 @@ Exec=mixterm
 Icon=mixterm
 Terminal=false
 Type=Application
-Categories=Network;RemoteAccess;System;
+Categories=Network;RemoteAccess;
 Keywords=ssh;sftp;terminal;remote;server;
 StartupWMClass=com.mixterm.mixterm
