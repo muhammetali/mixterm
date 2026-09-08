@@ -224,6 +224,23 @@ if [ -z "$DEPENDS" ]; then
   exit 1
 fi
 
+# Libraries the app opens with dlopen, which dpkg-shlibdeps cannot find:
+# it reads what an ELF links against, and these are named as strings at
+# runtime. libepoxy — which GTK does link, and which appears in the computed
+# list — loads libEGL.so.1 and libGL.so.1 itself.
+#
+# The snap failed exactly here twice, aborting with "Couldn't open
+# libEGL.so.1" while every library check passed. This package has the same
+# hole: it works on a desktop Ubuntu only because something else already
+# pulled libegl1 in. On a minimal install it would install cleanly and then
+# not start.
+for extra in libegl1 libgl1; do
+  case "$DEPENDS" in
+    *"$extra"*) : ;;
+    *) DEPENDS="$DEPENDS, $extra" ;;
+  esac
+done
+
 # libc6 is the one that matters here, and its absence is what made the
 # previous package installable on systems it could not run on.
 case "$DEPENDS" in

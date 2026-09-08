@@ -210,6 +210,33 @@ jobs:
             exit 1
           fi
 
+          # Start it, for the same reason the snap job does: installing
+          # proves nothing about running, and the library the app opens at
+          # runtime is invisible to dpkg-shlibdeps. apt has just resolved the
+          # declared dependencies, so this also checks that the declaration
+          # is sufficient rather than merely present.
+          sudo apt-get install -y xvfb
+          set +e
+          output="$(xvfb-run -a timeout 30 mixterm 2>&1)"
+          status=$?
+          set -e
+
+          echo "::group::application output"
+          echo "$output"
+          echo "::endgroup::"
+
+          if echo "$output" | grep -qE "cannot open shared object|core dumped|Aborted|GLIBC_|Couldn't open"; then
+            echo "::error::the package installs and then fails to start"
+            exit 1
+          fi
+
+          if [ "$status" -ne 124 ]; then
+            echo "::error::the app exited on its own with status $status"
+            exit 1
+          fi
+
+          echo "ran for 30s without failing"
+
           echo "::group::lintian"
           lintian --no-tag-display-limit "$deb" || true
           echo "::endgroup::"
@@ -297,6 +324,33 @@ jobs:
           echo "::group::interfaces"
           snap connections mixterm || true
           echo "::endgroup::"
+
+          # The launcher icon. A desktop file can name an icon that is not
+          # there and nothing complains — the menu just shows something else,
+          # which is how 1.1.8 ended up displaying the icon left behind by the
+          # .deb it replaced. Read the path the app declares and check it
+          # exists inside the snap.
+          desktop=/snap/mixterm/current/usr/share/applications/com.mixterm.mixterm.desktop
+          icon="$(sed -n 's|^Icon=||p' "$desktop")"
+          echo "declared icon: $icon"
+
+          case "$icon" in
+            '${SNAP}'/*)
+              resolved="/snap/mixterm/current/${icon#'${SNAP}'/}"
+              test -f "$resolved" || {
+                echo "::error::the desktop file points at $icon, which is not in the snap"
+                exit 1
+              }
+              echo "icon present: $resolved"
+              ;;
+            /*)
+              test -f "$icon" || { echo "::error::$icon does not exist"; exit 1; }
+              ;;
+            *)
+              echo "::error::Icon=$icon names a theme entry; a snap's own icon tree is not on the theme search path, so the launcher will show something else"
+              exit 1
+              ;;
+          esac
 
           set +e
           output="$(xvfb-run -a timeout 30 mixterm 2>&1)"

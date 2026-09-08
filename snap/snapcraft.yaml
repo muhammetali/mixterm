@@ -91,10 +91,27 @@ parts:
       ln -sf ../lib/mixterm/mixterm "$CRAFT_PART_INSTALL/usr/bin/mixterm"
       mkdir -p "$CRAFT_PART_INSTALL/usr/share/applications"
       # Exec=mixterm (the bare command name) is correct as-is for a snap
-      # desktop file — snapd rewrites it to route through `snap run` — so
-      # this is a plain copy, unlike the deb/PPA builds' Exec rewrite.
-      cp "$CRAFT_PROJECT_DIR/linux/runner/mixterm.desktop" \
-        "$CRAFT_PART_INSTALL/usr/share/applications/com.mixterm.mixterm.desktop"
+      # desktop file — snapd rewrites it to route through `snap run`.
+      #
+      # Icon is not. `Icon=mixterm` names an icon *theme* entry, and a snap's
+      # own usr/share/icons tree is not on the system's theme search path, so
+      # the name resolves to nothing and the launcher shows whatever it can
+      # find — for 1.1.8 on a machine that had previously held the .deb, the
+      # old icon left behind by it. Pointing at a file inside the snap is
+      # what makes the launcher show this app's icon; snapd expands ${SNAP}
+      # to the mount point when it exports the desktop file.
+      sed 's|^Icon=mixterm$|Icon=${SNAP}/usr/share/icons/hicolor/256x256/apps/mixterm.png|' \
+        "$CRAFT_PROJECT_DIR/linux/runner/mixterm.desktop" \
+        > "$CRAFT_PART_INSTALL/usr/share/applications/com.mixterm.mixterm.desktop"
+
+      # An Icon line that still names the theme entry means the sed above
+      # stopped matching, which would be invisible until someone looked at
+      # their application menu.
+      if grep -q '^Icon=mixterm$' \
+          "$CRAFT_PART_INSTALL/usr/share/applications/com.mixterm.mixterm.desktop"; then
+        echo "error: the desktop file still points at a theme icon name" >&2
+        exit 1
+      fi
       for size in 16 24 32 48 64 128 256 512; do
         dir="$CRAFT_PART_INSTALL/usr/share/icons/hicolor/${size}x${size}/apps"
         mkdir -p "$dir"
