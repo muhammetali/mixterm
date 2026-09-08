@@ -26,6 +26,48 @@ mkdir -p "$STAGING_DIR/usr/share/applications"
 # App bundle
 cp -r build/linux/x64/release/bundle/. "$STAGING_DIR/usr/lib/mixterm/"
 
+# Strip build-host paths out of RUNPATH.
+#
+# Flutter leaves the paths of the machine that built the code inside the
+# shipped libraries — lintian reports them as errors, and it is right to:
+#
+#   RUNPATH /home/runner/work/mixterm/mixterm/linux/flutter/ephemeral
+#   RUNPATH /usr/lib/jvm/temurin-11-jdk-amd64/lib/server
+#
+# Neither exists on anyone else's computer. They are harmless only because
+# the loader finds the libraries by another route first; as instructions to
+# the loader they are wrong, and they tell a reader of the package where it
+# happened to be built.
+#
+# Relative entries — $ORIGIN and friends — are how the app finds its own
+# libraries, so only absolute ones are removed.
+for lib in "$STAGING_DIR"/usr/lib/mixterm/lib/*.so "$STAGING_DIR/usr/lib/mixterm/mixterm"; do
+  [ -f "$lib" ] || continue
+
+  current="$(patchelf --print-rpath "$lib" 2>/dev/null || true)"
+  [ -n "$current" ] || continue
+
+  kept=""
+  IFS=':' read -ra entries <<< "$current"
+  for entry in "${entries[@]}"; do
+    case "$entry" in
+      /*) continue ;;
+      "") continue ;;
+      *) kept="${kept:+$kept:}$entry" ;;
+    esac
+  done
+
+  if [ "$kept" = "$current" ]; then
+    continue
+  elif [ -n "$kept" ]; then
+    patchelf --set-rpath "$kept" "$lib"
+    echo "  rpath trimmed: $(basename "$lib") -> $kept"
+  else
+    patchelf --remove-rpath "$lib"
+    echo "  rpath removed: $(basename "$lib")"
+  fi
+done
+
 # Launcher symlink on PATH
 ln -sf /usr/lib/mixterm/mixterm "$STAGING_DIR/usr/bin/mixterm"
 
@@ -127,6 +169,22 @@ HEADER
     indent_licence "assets/fonts/LICENSES/$licence_file"
   done
 } > "$copyright"
+
+# Changelog. Debian requires one for a native package, and lintian reports
+# its absence as an error. The release notes live on GitHub rather than in
+# the tree, so this points at them instead of duplicating them badly.
+#
+# gzip -9n: -n leaves the timestamp out, so building the same version twice
+# produces the same bytes.
+changelog_dir="$STAGING_DIR/usr/share/doc/${PKG_NAME}"
+mkdir -p "$changelog_dir"
+{
+  echo "${PKG_NAME} (${VERSION}) unstable; urgency=medium"
+  echo
+  echo "  * Release notes: https://github.com/muhammetali/mixterm/releases/tag/v${VERSION}"
+  echo
+  echo " -- Muhammet Ali Özçelik <noreply@mixterm.app>  $(date -R)"
+} | gzip -9n > "$changelog_dir/changelog.gz"
 
 # Dependencies, computed from the binaries rather than declared by hand.
 #

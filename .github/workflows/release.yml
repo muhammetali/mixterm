@@ -168,7 +168,7 @@ jobs:
           flutter-version: 3.38.9
 
       - run: sudo apt-get update
-      - run: sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+      - run: sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev patchelf
 
       - name: Write Google OAuth secret
         env:
@@ -200,12 +200,35 @@ jobs:
           dpkg -s mixterm | grep -E '^(Status|Version|Depends)'
           test -x /usr/bin/mixterm || test -L /usr/bin/mixterm
           test -f /usr/share/doc/mixterm/copyright
+          test -f /usr/share/doc/mixterm/changelog.gz
+
+          # No build-host paths should have survived into the installed
+          # libraries. lintian catches this too, but asserting it here says
+          # what went wrong rather than leaving it in a wall of tags.
+          if grep -rlI '/home/runner' /usr/lib/mixterm/ 2>/dev/null; then
+            echo "::error::build-host paths are present in the installed files"
+            exit 1
+          fi
 
           echo "::group::lintian"
           lintian --no-tag-display-limit "$deb" || true
           echo "::endgroup::"
 
-          if lintian --fail-on error --no-tag-display-limit "$deb"; then
+          # Two error classes are inherent to shipping a Flutter build rather
+          # than defects in this package, and gating on them would only make
+          # the step something to route around:
+          #
+          #   embedded-library — the engine statically links freetype, libpng
+          #     and libjpeg. Changing that means rebuilding Flutter's engine.
+          #   unstripped-binary-or-object — libapp.so is an AOT snapshot;
+          #     stripping the shipped libraries risks the app for tidiness.
+          #
+          # Everything else still fails, including the two this caught the
+          # first time it ran: build-host paths left in RUNPATH, and a
+          # missing changelog.
+          if lintian --fail-on error --no-tag-display-limit \
+               --suppress-tags embedded-library,unstripped-binary-or-object \
+               "$deb"; then
             echo "no lintian errors"
           else
             echo "::error::lintian reported errors above"
