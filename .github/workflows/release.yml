@@ -226,12 +226,23 @@ jobs:
         with:
           path: artifacts
 
+      # Re-runnable. A release that has to be rebuilt — because a build was
+      # wrong, or because a secret was missing the first time — should be able
+      # to replace its assets instead of failing with "release already
+      # exists". `--generate-notes` stays on the create path only, so notes
+      # written by hand after the fact survive a rebuild.
       - run: |
-          gh release create "${{ github.ref_name }}" \
-            artifacts/mixterm-macos/mixterm-macos.zip \
-            artifacts/mixterm-deb/*.deb \
-            artifacts/mixterm-snap/*.snap \
-            --title "${{ github.ref_name }}" \
-            --generate-notes
+          assets=(
+            artifacts/mixterm-macos/mixterm-macos.zip
+            artifacts/mixterm-deb/*.deb
+            artifacts/mixterm-snap/*.snap
+          )
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+          else
+            gh release create "$TAG" "${assets[@]}" --title "$TAG" --generate-notes
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
