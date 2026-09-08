@@ -10,6 +10,9 @@ description: |
   MixTerm is a professional SSH/SFTP client with multi-tab terminal
   sessions, a visual SFTP file browser, AES-256 encrypted credential
   storage, and Google Drive cloud sync.
+# SPDX identifier, shown on the store listing. Only meaningful now that
+# the repository actually carries a LICENSE file.
+license: MIT
 grade: stable
 confinement: strict
 
