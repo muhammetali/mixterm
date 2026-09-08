@@ -1,5 +1,15 @@
 name: mixterm
-base: core22
+# Must match the distribution the snap is built on. CI builds with
+# `snapcraft --destructive-mode` on ubuntu-latest, so stage-packages come
+# straight from that host's apt — 24.04, glibc 2.39. Declaring core22
+# gave the snap a 2.35 runtime instead, and it installed cleanly, passed
+# the store's review and then refused to start:
+#
+#   libgtk-3.so.0: version `GLIBC_2.38' not found
+#
+# snapd ships the base itself, so core24 costs nothing in reach: the snap
+# still runs on 22.04 hosts.
+base: core24
 # Read from pubspec.yaml at build time rather than written here. It was
 # hardcoded, and the 1.1.0 release shipped a snap still calling itself
 # 1.0.0 — the .deb was correct because its build script already derives the
