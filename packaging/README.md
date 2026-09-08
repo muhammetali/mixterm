@@ -28,13 +28,35 @@ manual step from you:
   (App Store Connect API credentials for notarization are already set as
   `APP_STORE_CONNECT_API_KEY_P8`/`_KEY_ID`/`_ISSUER_ID` secrets.)
 
-- **Homebrew submission:** once a release has been built with real signing
-  (the `if: secrets.APPLE_CERT_P12 != ''` steps ran), download
-  `mixterm-macos.zip` from that release, run `shasum -a 256` on it, and put
-  the real hash into `packaging/homebrew/mixterm.rb`. Then fork
-  github.com/Homebrew/homebrew-cask, add that file as `Casks/m/mixterm.rb`,
-  and open a PR. Homebrew's cask CI will check the download, signature, and
-  formatting automatically.
+  All three certificate secrets are set as of 1.1.2. They were not for
+  1.1.1, whose macOS zip published ad-hoc signed and had to be pulled: the
+  signing steps were conditional on the secret and a skipped step is a green
+  step. A tagged build now fails outright without them, and the built app is
+  inspected before packaging, so signing that is configured but does not take
+  is caught too.
+
+- **Homebrew:** shipped through a personal tap,
+  [muhammetali/homebrew-tap](https://github.com/muhammetali/homebrew-tap):
+
+  ```sh
+  brew trust muhammetali/tap   # Homebrew 6+ refuses third-party taps otherwise
+  brew tap muhammetali/tap
+  brew install --cask mixterm
+  ```
+
+  `packaging/homebrew/mixterm.rb` is the source of truth; the tap holds a
+  copy at `Casks/mixterm.rb`, and the `update-homebrew-tap` job rewrites its
+  `version` and `sha256` after each release. That job needs
+  `HOMEBREW_TAP_TOKEN` — a fine-grained token with **Contents: write** on the
+  tap repository and nothing else, because `GITHUB_TOKEN` is scoped to this
+  repository and cannot push to another one. Without it a tagged release
+  fails rather than quietly leaving `brew upgrade` on the previous version.
+
+  Submitting to homebrew-cask itself is not possible yet. Their [package
+  acceptance policy](https://github.com/Homebrew/brew/blob/master/docs/Package-Acceptance-Policy.md)
+  asks a repository owner submitting their own project for **90 forks, 90
+  watchers or 225 stars**; this repository has none of the three. The cask is
+  written to their rules and moves across unchanged when that day comes.
 
 ## Linux — .deb (GitHub Releases)
 
