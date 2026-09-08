@@ -19,6 +19,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # A tagged build is something people download. Shipping it unsigned
+      # is worse than not shipping it: macOS refuses to open an app with
+      # no Developer ID, so the download is simply broken for everyone
+      # who is not the person who built it.
+      #
+      # This exists because it already happened. v1.1.1 published a macOS
+      # zip with `TeamIdentifier=not set` and no notarization ticket, and
+      # every job in the run reported success — the signing steps below
+      # are conditional, and a skipped step is a green step. It was found
+      # only by downloading the published artefact and checking it.
+      #
+      # Untagged runs may still go unsigned: they exist to check that the
+      # build compiles, and nobody installs them.
+      - name: Require signing for a release
+        if: ${{ startsWith(github.ref, 'refs/tags/v') && env.HAS_APPLE_CERT != 'true' }}
+        run: |
+          echo "::error::APPLE_CERT_P12 is not set, so this tag would publish an unsigned macOS app that Gatekeeper refuses to open. See packaging/README.md for the certificate secrets."
+          exit 1
+
       # Pinned to the exact version this project is developed/tested
       # against. dartssh2 2.14.0 (a direct dependency) fails to compile
       # on newer Dart SDKs — a real type-promotion bug in its own
@@ -72,17 +91,51 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
-          mkdir -p ~/private_keys
-          echo "$APP_STORE_CONNECT_API_KEY_P8" > "~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          # Tilde is not expanded inside quotes, so the original
+          # `> "~/private_keys/..."` wrote to a literal `./~` directory
+          # that mkdir had not created, and the step died on its second
+          # line. It had never run: signing was skipped, so notarization
+          # was skipped with it, and the bug sat behind a condition that
+          # was never true.
+          KEY_DIR="$HOME/private_keys"
+          KEY_PATH="$KEY_DIR/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          mkdir -p "$KEY_DIR"
+          printf '%s\n' "$APP_STORE_CONNECT_API_KEY_P8" > "$KEY_PATH"
           ditto -c -k --keepParent \
             build/macos/Build/Products/Release/mixterm.app \
             mixterm-notarize.zip
           xcrun notarytool submit mixterm-notarize.zip \
-            --key ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8 \
+            --key "$KEY_PATH" \
             --key-id "$APP_STORE_CONNECT_KEY_ID" \
             --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
             --wait
           xcrun stapler staple build/macos/Build/Products/Release/mixterm.app
+
+      # Checks the app rather than the workflow. The guard at the top of
+      # this job asserts the secret exists; this asserts the signing
+      # actually took, which is the thing a user downloading the zip
+      # depends on. Both are needed — v1.1.1 had every step green and
+      # still shipped `TeamIdentifier=not set`.
+      #
+      # `spctl --assess` is deliberately not used: it reports "accepted"
+      # on a machine where assessment is disabled, which is how the
+      # unsigned build looked fine when first checked by hand.
+      - name: Verify the app is signed and notarized
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          APP=build/macos/Build/Products/Release/mixterm.app
+
+          if codesign -dv "$APP" 2>&1 | grep -q 'TeamIdentifier=not set'; then
+            echo "::error::the app is ad-hoc signed — Gatekeeper will refuse to open it"
+            exit 1
+          fi
+
+          if ! xcrun stapler validate "$APP"; then
+            echo "::error::no notarization ticket is stapled to the app"
+            exit 1
+          fi
+
+          codesign -dv "$APP" 2>&1 | grep -E 'Authority|TeamIdentifier'
 
       - name: Package .zip for Homebrew
         run: |
