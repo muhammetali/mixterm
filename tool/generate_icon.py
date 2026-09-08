@@ -198,11 +198,26 @@ def build() -> Image.Image:
 def main() -> None:
     icon = build()
 
+    # Every place a packaged icon lives. Leaving one out does not fail
+    # anything: the file stays where it was, the build picks it up, and the
+    # only symptom is one platform quietly showing the previous design.
+    #
+    # That happened. The redesign wrote only the macOS targets, so Linux kept
+    # the old icon through six releases — measurably so, with a darkest point
+    # of 0 where the redesign had removed pure black, and 0.12% of pixels
+    # bright against 4.67%. Nobody saw it until the snap's launcher started
+    # working and showed the wrong picture.
+    #
+    # The sizes are the ones each packaging actually installs: see the
+    # `for size in ...` loops in scripts/build_deb.sh and snap/snapcraft.yaml.
     targets = {
         "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_%d.png": [
             16, 32, 64, 128, 256, 512, 1024
         ],
         "assets/icons/macos/app_icon_%d.png": [16, 32, 64, 128, 256, 512],
+        "assets/icons/linux/mixterm_%d.png": [
+            16, 24, 32, 48, 64, 128, 256, 512
+        ],
     }
     for pattern, sizes in targets.items():
         for size in sizes:
