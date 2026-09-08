@@ -1,6 +1,10 @@
 name: mixterm
 base: core22
-version: '1.0.0'
+# Read from pubspec.yaml at build time rather than written here. It was
+# hardcoded, and the 1.1.0 release shipped a snap still calling itself
+# 1.0.0 — the .deb was correct because its build script already derives the
+# version from pubspec. One number, one home.
+adopt-info: mixterm
 summary: Professional SSH/SFTP client
 description: |
   MixTerm is a professional SSH/SFTP client with multi-tab terminal
@@ -26,6 +30,9 @@ apps:
 
 parts:
   mixterm:
+    override-pull: |
+      craftctl default
+      craftctl set version="$(grep '^version:' "${CRAFT_PROJECT_DIR}/pubspec.yaml" | sed -E 's/version:[[:space:]]*([0-9.]+).*/\1/')"
     # Packages the Flutter Linux bundle built by a prior CI step (with a
     # pinned Flutter version — see release.yml) rather than letting a
     # snapcraft plugin fetch/build Flutter itself. The `flutter` plugin's
