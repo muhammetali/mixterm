@@ -275,6 +275,19 @@ jobs:
             exit 1
           fi
 
+          # Absence of "not found" is only good news if something was looked
+          # at. Grepping empty output passes just as cleanly as grepping a
+          # healthy snap, so the count is asserted too — a GTK application
+          # resolves dozens of libraries, and anything near zero means the
+          # inspection itself failed and this check was measuring nothing.
+          resolved="$(grep -c '=>' ldd.txt || true)"
+          echo "resolved libraries: $resolved"
+          if [ "$resolved" -lt 20 ]; then
+            echo "::error::only $resolved libraries resolved — the check did not inspect the snap"
+            sed -n '1,20p' ldd.txt
+            exit 1
+          fi
+
           echo "all libraries resolved against the declared base"
 
       - uses: actions/upload-artifact@v4
