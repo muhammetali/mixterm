@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:provider/provider.dart';
 import 'app.dart';
+import 'utils/constants.dart';
 import 'services/storage_service.dart';
 import 'services/auth_service.dart';
 import 'services/sync_service.dart';
@@ -45,6 +46,8 @@ void main() async {
       );
     }
   });
+
+  await AppConstants.loadVersion();
 
   final prefs = await SharedPreferences.getInstance();
   final storageService = StorageService(prefs);

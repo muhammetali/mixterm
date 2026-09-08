@@ -1,6 +1,41 @@
+import 'package:package_info_plus/package_info_plus.dart';
+
 class AppConstants {
   static const String appName = 'MixTerm';
-  static const String appVersion = '1.0.0';
+
+  /// The running build's version, as reported by the packaged metadata.
+  ///
+  /// Deliberately not a literal. This constant sat at `1.0.0` while
+  /// `pubspec.yaml`, the macOS bundle and the git tag had all moved on, so
+  /// Settings showed a version that had not shipped for two releases — and
+  /// nothing failed, because a stale string is still a valid string. The
+  /// same mistake had already been made in `snap/snapcraft.yaml`, which
+  /// shipped 1.1.0 labelled 1.0.0.
+  ///
+  /// Reading it from the platform means there is exactly one place a
+  /// version is written down — `pubspec.yaml` — and every packaging format
+  /// derives from it.
+  static String appVersion = unknownVersion;
+
+  /// Shown when the platform metadata cannot be read: a widget test, or a
+  /// build run before [loadVersion]. Says "not known" rather than naming a
+  /// version that might be wrong.
+  static const String unknownVersion = 'unknown';
+
+  /// Reads the version out of the running package. Call once, before
+  /// `runApp`; failure is not fatal, since a missing version in an About
+  /// box is not a reason to refuse to start.
+  static Future<void> loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (info.version.isEmpty) return;
+      appVersion = info.buildNumber.isEmpty
+          ? info.version
+          : '${info.version} (${info.buildNumber})';
+    } catch (_) {
+      // Leave [unknownVersion] in place.
+    }
+  }
 
   static const int defaultPort = 22;
   static const int connectionTimeout = 30;
