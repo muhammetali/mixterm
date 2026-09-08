@@ -318,3 +318,53 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -am "Update MixTerm to ${TAG#v}"
           git push
+
+  # Publishes to the Snap Store, so `snap install mixterm` gets the release
+  # rather than only whoever finds the .snap file on this page.
+  #
+  # Fails rather than skips without credentials, for the same reason as the
+  # signing and tap guards above: a skipped step is a green step, and a
+  # release that quietly does not reach the store is one nobody notices for
+  # months.
+  publish-snap:
+    needs: create-release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    env:
+      # `if:` cannot reference `secrets`.
+      HAS_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS != '' }}
+    steps:
+      - name: Require store credentials
+        if: ${{ env.HAS_STORE_CREDENTIALS != 'true' }}
+        run: |
+          echo "::error::SNAPCRAFT_STORE_CREDENTIALS is not set, so this release would not reach the Snap Store. Produce it with 'snapcraft export-login --snaps=mixterm --acls package_access,package_push,package_update,package_release' and add it as a repository secret."
+          exit 1
+
+      - name: Fetch the snap from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.snap' \
+            --dir .
+
+          # One snap, and the name has to carry the version being released —
+          # the manifest derives it from pubspec, and a mismatch here would
+          # mean the store publishing something other than this tag.
+          count="$(ls -1 ./*.snap | wc -l)"
+          [ "$count" -eq 1 ] || { echo "::error::expected exactly one .snap, found $count"; exit 1; }
+
+          snap="$(ls ./*.snap)"
+          case "$snap" in
+            *_"${TAG#v}"_*) echo "snap=$snap" >> "$GITHUB_ENV" ;;
+            *) echo "::error::$snap does not carry version ${TAG#v}"; exit 1 ;;
+          esac
+
+      - uses: snapcore/action-publish@v1.2.0
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ env.snap }}
+          release: stable
